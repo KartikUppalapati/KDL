@@ -1,6 +1,6 @@
 {
-  "name": "kartsdl",
-  "productName": "KartsDL",
+  "name": "kdl",
+  "productName": "kdl",
   "version": "1.0.0",
   "description": "Application to donwload songs from youtube, get their metadata, and save them",
   "main": "src/main.js",
@@ -13,8 +13,8 @@
     "dist": "electron-builder"
   },
   "build": {
-    "appId": "com.karts.kartsDL",
-    "productName": "KartsDL",
+    "appId": "com.karts.kdl",
+    "productName": "kdl",
     "win": {
       "target": "nsis"
     },
