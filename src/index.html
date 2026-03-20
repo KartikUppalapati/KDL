@@ -1,590 +1,655 @@
-<!DOCTYPE HTML>
-<html>
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
     <head>
-        <title>KartsDL v0.0.1</title>
-        <link rel="stylesheet" href="index.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+        <title>KDL</title>
+        <meta charset="utf-8" />
+        <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge"/> -->
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+        <!-- GOOGLE FONTS -->
+        <link type="text/css" href="plugins/material/css/materialdesignicons.min.css" rel="stylesheet"/>
+        <link type="text/css" href="plugins/simplebar/simplebar.css" rel="stylesheet"/>
+
+        <!-- MONO CSS -->
+        <link type="text/css" href="index.css" id="main-css-href" rel="stylesheet"/>
+
+        <!-- FAVICON -->
+        <!-- <link href="images/favicon.png" rel="shortcut icon"/> -->
+        <script src="plugins/nprogress/nprogress.js"></script>
     </head>
-    <body>
-        <div id="sideNav" class="sidenav">
-            <label onclick="doButtonAction(0)">Download</label>
-            <label onclick="doButtonAction(1)">Scan</label>
-            <label onclick="doButtonAction(2)">Save</label>
-            <label id="openFolderButton" onclick="doButtonAction(3)">Choose Folder</label>
-        </div>
 
-        <div id="mainTextArea" class="mainTextArea">
-        </div>
+    <body class="navbar-fixed" id="body">
+        <div class="wrapper">
+            <div class="page-wrapper">
+                <!-- Top Navbar -->
+                <header class="main-header" id="header">
+                    <nav id="navbar" class="navbar navbar-expand-lg navbar-light">
+                        <!-- Message Area -->
+                        <div id="serverMessage" class="navbar-left">
+                        </div>
+                        
+                        <!-- Profile Area -->
+                        <div class="navbar-right">
+                            <button class="nav nav-link button-hover" onclick="deleteSongs()">
+                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-delete"></i></h5>
+                            </button>
+                            <button class="nav nav-link button-hover" onclick="scanSongs()">
+                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-file-find"></i></h5>
+                            </button>
+                            <button class="nav nav-link button-hover" onclick="saveSongs()">
+                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-content-save"></i></h5>
+                            </button>
+                        </div>
+                    </nav>
+                </header>
 
-        <div class="folderTextArea">
-            <p id="folderText"></p>
-        </div>
+                <!-- Dashboard Areas -->
+                <div class="content-wrapper">
+                    <div class="content" style="height: 100%;">
+                        <div id="homeArea" style="height: 100%;">
+                            <div class="row" style="height: 100%;">
+                                <!-- Folder Area -->
+                                <div class="col-4">
+                                    <div class="card card-default" style="height: 95%;">
+                                        <div class="card-body mt-1">
+                                            <!-- Folder Path -->
+                                            <div class="input-group mb-0">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text">
+                                                        <i class="mdi mdi-folder-open" style="cursor: pointer;" onclick="openSongsFolder()"></i>
+                                                    </span>
+                                                </div>
+                                                <input id="folderPath" class="form-control"
+                                                style="pointer-events: none;" type="text">
+                                            </div>
 
-        <div id="downloadModal" class="modal">
-            <div id="downloadModalContent" class="modal-content centerStuffH">
-                <h1>Enter YouTube Link</h1>
-                <input id="youtubeLink" class="searchBar" type="text"/>
-                <button id="youtubeLinkDownloadButton" class="searchButton" onclick="downloadYoutubeLink()"><i class="fa fa-download"></i></button>
-            </div>
-        </div>
-        <div id="chooseFolderModal" class="modal">
-            <div class="modal-content">
-                <div class="">
-                <h1>Default open system files dialog</h1>
+                                            <!-- File List -->
+                                            <div class="row mt-3" style="height: 97%;">
+                                                <div class="col-12">
+                                                    <div id="folderFiles" style="height: 62vh; overflow-y: auto;">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Spotify Area -->
+                                <div class="col-5">
+                                    <div class="card card-default" style="height: 95%;">
+                                        <div class="card-body mt-1">
+                                            <!-- Song Metadata -->
+                                            <div class="row" style="height: 35%;">
+                                                <!-- Album Image -->
+                                                <div class="col-5">
+                                                    <div>
+                                                        <img id="spotifyImage" src="" width="145" height="145">
+                                                    </div>
+                                                </div>
+
+                                                <!-- Title, Artist, Album -->
+                                                <div class="col-7">
+                                                    <div class="card-default" style="height: 95%;">
+                                                        <!-- Title -->
+                                                        <div class="input-group mb-1">
+                                                            <div class="input-group-prepend">
+                                                                <span class="input-group-text">
+                                                                    <i class="mdi mdi-music"></i>
+                                                                </span>
+                                                            </div>
+                                                            <input id="spotifyTitle" class="form-control" type="text">
+                                                        </div>
+
+                                                        <!-- Artist -->
+                                                        <div class="input-group mb-1">
+                                                            <div class="input-group-prepend">
+                                                                <span class="input-group-text">
+                                                                    <i class="mdi mdi-account"></i>
+                                                                </span>
+                                                            </div>
+                                                            <input id="spotifyArtist" class="form-control" type="text">
+                                                        </div>
+
+                                                        <!-- Album -->
+                                                        <div class="input-group mb-1">
+                                                            <div class="input-group-prepend">
+                                                                <span class="input-group-text">
+                                                                    <i class="mdi mdi-album"></i>
+                                                                </span>
+                                                            </div>
+                                                            <input id="spotifyAlbum" class="form-control" type="text">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Spotify Search -->
+                                            <div class="input-group mb-0">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text">
+                                                        <i id="spotifyLogo" class="mdi mdi-spotify"></i>
+                                                    </span>
+                                                </div>
+                                                <input id="spotifySearch" class="form-control"  type="text">
+                                            </div>
+
+                                            <!-- Spotify Results -->
+                                            <div class="row mt-3 mb-3" style="height: 57%;">
+                                                <div class="col-12">
+                                                    <div id="spotifyResults" style="height: 37vh; overflow-y: auto;">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Download Area -->
+                                <div class="col-3">
+                                    <div class="card card-default" style="height: 95%;">
+                                        <div class="card-body mt-1">
+                                            <!-- Video Link -->
+                                            <div class="input-group mb-0">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text">
+                                                        <i id="downloadLogo" class="mdi mdi-download"></i>
+                                                    </span>
+                                                </div>
+                                                <input id="downloadLink" class="form-control" type="text">
+                                            </div>
+
+                                            <!-- Console Log -->
+                                            <div class="row mt-3 mb-3" style="height: 97%;">
+                                                <div class="col-12">
+                                                    <div id="downloadLogs" style="height: 60vh; overflow-y: auto;">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+    </body>
 
-        <div id="onlyBackgroundModal" class="modal"></div>
-        <div id="slideout">
-            <table id="slideoutTable">
-                <td>
-                    <img id="songEditImage" src="" width="115" height="115">
-                </td>
-                <td class="wideMiddleTableColumn" style="padding: 10px;">
-                    <input id="songEditTitle" type="text" class="slideoutInput"></br>
-                    <input id="songEditArtist" type="text" class="slideoutInput"></br>
-                    <input id="songEditAlbum" type="text" class="slideoutInput"></br>
-                </td>
-            </table>
-            <input id="spotifySearchInput" class="searchBar" type="text"/>
-            <button id="spotifySearchButton" class="searchButton" onclick="searchSong()"><i class="fa fa-search"></i></button>
-            <h1 id="slideoutHeader">Download In Progress</h1>
-            <div id="slideoutTextArea" class="slideoutTextAreaClass"></div>
-        </div>
+    <script>
+        // Init stuff
+        var fileCount = 0;
+        var msgDivMsg = null;
+        var asyncFunctionTimeout = 200;
+        var currentDashboard = "homeArea";
+        var ipc = require("electron").ipcRenderer;
+        var currentProfileButton = "profileInfoButton";
+        var folderPath = document.getElementById("folderPath");
+        var folderFiles = document.getElementById("folderFiles");
+        var downloadLink = document.getElementById("downloadLink");
+        var downloadLogs = document.getElementById("downloadLogs");
+        var spotifyImage = document.getElementById("spotifyImage");
+        var spotifyTitle = document.getElementById("spotifyTitle");
+        var spotifyAlbum = document.getElementById("spotifyAlbum");
+        var spotifyArtist = document.getElementById("spotifyArtist");
+        var spotifySearch = document.getElementById("spotifySearch");
+        var spotifyResults = document.getElementById("spotifyResults");
 
-        <script>
-            // Variable stuff
-            const clientId = "6d3c6efcc74b4891981593966033ec76"
-            const clientSecret = "530dcb7cc7dd43e2bf0e5ff4ebad6be2"
-            var ipc = require('electron').ipcRenderer;
-            var listOfSongFilesData = [];
-            var listOfSongSearchedData = [];
-            var numSongs = 0;
+        // Get files in default folder path
+        ipc.send("getFolderPath", {});
 
-            // Set all buttons to disabled except choose folder button
-            makeButtonsDisabled(4);
-            makeButtonsEnabled(3);
+        // Hide spotify image initially
+        spotifyImage.style.visibility = "hidden";
 
-            // When user presses side buttons
-            function doButtonAction(buttonIndex)
-            {
-                // Download button
-                if (buttonIndex == 0)
-                {
-                    // Get the modal
-                    var modal = document.getElementById("downloadModal");
-
-                    // Clear input and display modal
-                    document.getElementById("youtubeLink").value = "";
-                    modal.style.display = "block";
-
-                    // When the user clicks anywhere outside of the modal close it
-                    window.onclick = function(event) 
-                    {
-                        if (event.target == modal) 
-                        {
-                            modal.style.display = "none";
-                        }
-                    }
-                }
-                // Scan button
-                else if (buttonIndex == 1)
-                {
-                    // Scan songs
-                    scanSongs();
-                }
-                // Save button
-                else if (buttonIndex == 2)
-                {
-                    saveSongs();
-                }
-                // Folder chooser button
-                else if (buttonIndex == 3)
-                {
-                    // Once folder full path receieved show in folder text area
-                    ipc.once("openFolderDialogReply", function(event, folderFullPath)
-                    {
-                        if (folderFullPath != undefined)
-                        {
-                            document.getElementById("folderText").innerHTML = folderFullPath;
-                            ipc.send("getFilesInFolder", folderFullPath);
-                        }
-                    });
-                    ipc.once("getFilesInFolderReply", function(event, listOfFiles)
-                    {
-                        // Set numSongs variable
-                        numSongs = listOfFiles.length;
-
-                        // Clear text area
-                        document.getElementById("mainTextArea").innerHTML = "";
-
-                        // Go through list of files and add to text area
-                        for (let i = 0; i < listOfFiles.length; i++) 
-                        {
-                            document.getElementById("mainTextArea").innerHTML +=
-                            `<div id="song${i}" class="textAreaSongItem">
-                                ${listOfFiles[i]}
-                            </div>`;
-                        }
-
-                        // Make download button enabled and disable save button
-                        makeButtonsEnabled(0);
-                        makeButtonsDisabled(2);
-
-                        // If any songs then make scan button enabled
-                        if (numSongs > 0)
-                        {
-                            makeButtonsEnabled(1);
-                        }
-                    });
-                    
-                    // API call in main.js
-                    ipc.send("openFolderDialog", "");
-                }
-            };
-
-            // When download button pressed
-            function downloadYoutubeLink()
-            {
-                // Close download modal
-                document.getElementById("downloadModal").style.display = "none"
-
-                // Open background modal
-                document.getElementById("slideoutTextArea").innerHTML = "";
-                document.getElementById("onlyBackgroundModal").style.display = "block";
-
-                // Open editing side bar and make ready for download
-                document.getElementById("slideout").classList.toggle("on");
-                document.getElementById("slideoutTable").style.display = "none";
-                document.getElementById("spotifySearchInput").style.display = "none";
-                document.getElementById("spotifySearchButton").style.display = "none";
-                document.getElementById("slideoutHeader").style.display = "block";
-                document.getElementById("slideoutTextArea").style.marginTop = "0";
-                document.getElementById("slideoutTextArea").style.height = "75%";
-
-                // API call in main.js
-                var youtubeLink = document.getElementById("youtubeLink").value;
-                ipc.send("downloadYoutubeLink", youtubeLink, document.getElementById("folderText").innerHTML);
-
-                // Display things after unsuccessful download
-                ipc.once("downloadCompletedUnsuccessfully", function(event, data)
-                {
-                    // Change header
-                    document.getElementById("slideoutHeader").innerHTML = "Download Unsuccessful: Click Away";
-
-                    // On click away make slidout normal
-                    var modal = document.getElementById("onlyBackgroundModal");
-                    window.onclick = function(event) 
-                    {
-                        if (event.target == modal) 
-                        {
-                            modal.style.display = "none";
-                            makeSlideoutNormal();
-                        }
-                    }
-                });
-
-                // Get all files in folder after download complete
-                ipc.once("downloadCompletedSuccessfully", function(event, data)
-                {
-                    // Get all new files
-                    var folderFullPath = document.getElementById("folderText").innerHTML;
-                    ipc.once("getFilesInFolderReply", function(event, listOfFiles)
-                    {
-                        // Set numSongs variable
-                        numSongs = listOfFiles.length;
-
-                        // Clear text area
-                        document.getElementById("mainTextArea").innerHTML = "";
-
-                        // Go through list of files and add to text area
-                        for (let i = 0; i < listOfFiles.length; i++) 
-                        {
-                            document.getElementById("mainTextArea").innerHTML +=
-                            `<div id="song${i}" class="textAreaSongItem">
-                                ${listOfFiles[i]}
-                            </div>`;
-                        }
-
-                        // Make download button enabled and disable save button
-                        makeButtonsEnabled(0);
-                        makeButtonsDisabled(2);
-
-                        // If any songs then make scan button enabled
-                        if (numSongs > 0)
-                        {
-                            makeButtonsEnabled(1);
-                        }
-                    });
-                    ipc.send("getFilesInFolder", folderFullPath);
-                    
-                    // Change header
-                    document.getElementById("slideoutHeader").innerHTML = "Download Successful: Click Away";
-
-                    // On click away make slidout normal
-                    var modal = document.getElementById("onlyBackgroundModal");
-                    window.onclick = function(event) 
-                    {
-                        if (event.target == modal) 
-                        {
-                            modal.style.display = "none";
-                            makeSlideoutNormal();
-                        }
-                    }
-                });
-            }
-
-            // Make slidout normal after download
-            function makeSlideoutNormal()
-            {
-                // Clear text area
-                document.getElementById("slideoutTextArea").innerHTML = "";
-                document.getElementById("slideoutHeader").innerHTML = "Download In Progress";
-
-                // Close editing side bar and make ready for download
-                document.getElementById("slideout").classList.toggle("on");
-                document.getElementById("slideoutTable").style.display = "block";
-                document.getElementById("spotifySearchInput").style.display = "block";
-                document.getElementById("spotifySearchButton").style.display = "block";
-                document.getElementById("slideoutHeader").style.display = "none";
-                document.getElementById("slideoutTextArea").style.marginTop = "4.2%";
-                document.getElementById("slideoutTextArea").style.height = "60%";
-            }
-
-            // When search button pressed
-            const searchSong = async () =>
-            {
-                // Use spotify api endpoint to get token
-                var result = await fetch("https://accounts.spotify.com/api/token", 
-                {
-                    method: "POST",
-                    headers: 
-                    {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Authorization": "Basic " + btoa(clientId + ":" + clientSecret)
-                    },
-                    body: "grant_type=client_credentials"
-                })
-
-                // Get token
-                var data = await result.json()
-                token = data.access_token;
-
-                // Use spotify api to search by track
-                var result = await fetch(`https://api.spotify.com/v1/search?q=${document.getElementById("spotifySearchInput").value.replaceAll(" ", "+")}&type=track`,
-                {
-                    method: "GET",
-                    headers: {"Authorization": "Bearer " + token}
-                })
-
-                // Get response
-                var data = await result.json()
-
-                // Clear html on each new search
-                document.getElementById("slideoutTextArea").innerHTML = "";
-
-                // Go through all tracks in response
-                for (let i = 0; i < data.tracks.items.length; i++)
-                {
-                    // Get individual response song's meta data and push into list data
-                    var songMetaData = 
-                    {
-                        "songName": data.tracks.items[i].name,
-                        "albumName": data.tracks.items[i].album.name,
-                        "artistName": data.tracks.items[i].artists[0].name,
-                        "albumImage": data.tracks.items[i].album.images[0].url
-                    }
-                    listOfSongSearchedData.push(songMetaData);
-
-                    // Create and add song's html for text box
-                    document.getElementById("slideoutTextArea").innerHTML +=
-                    `<div class="textAreaSongItem" ondblclick="copyChosenTrack(${i})">
-                        <table>
-                            <td>
-                                <img src="${songMetaData.albumImage}" width="50" height="50">
-                            </td>
-                            <td class="wideMiddleTableColumn">
-                                Title: ${songMetaData.songName}</br>
-                                Artist: ${songMetaData.artistName}</br>
-                                Album: ${songMetaData.albumName}</br>
-                            </td>
-                            <td>
-                                <i class="fa fa-clone hoverMe" aria-hidden="true" style="font-size: 15px;" onclick="copyChosenTrack(${i})"></i>
-                            </td>
-                        </table>
-                    </div>`
-                }
-            }
-
-            // For song editing modal
-            function copyChosenTrack(songMetaDataIndex)
-            {
-                songMetaData = listOfSongSearchedData[songMetaDataIndex];
-                document.getElementById("songEditImage").src = songMetaData.albumImage;
-                document.getElementById("songEditTitle").value = songMetaData.songName;
-                document.getElementById("songEditArtist").value = songMetaData.artistName;
-                document.getElementById("songEditAlbum").value = songMetaData.albumName;
-            }
-
-            // For song editing modal
-            function openSongEditSideBar(childIndexInSongFiles)
-            {
-                // Get the modal
-                var modal = document.getElementById("onlyBackgroundModal");
-
-                // Open the modal
-                document.getElementById("slideoutTextArea").innerHTML = "";
-                modal.style.display = "block";
-
-                // Get song meta data from input using list of song files data
-                var songMetaData = listOfSongFilesData[childIndexInSongFiles];
-                document.getElementById("songEditImage").src = songMetaData.albumImage;
-                document.getElementById("songEditTitle").value = songMetaData.songName;
-                document.getElementById("songEditArtist").value = songMetaData.artistName;
-                document.getElementById("songEditAlbum").value = songMetaData.albumName;
-                document.getElementById("spotifySearchInput").value = songMetaData.songFileName.replaceAll("&amp;", "&").trim();
-
-                // Open editing side bar
-                document.getElementById("slideout").classList.toggle("on");
-
-                // When user clicks outside modal
-                window.onclick = function(event) 
-                {
-                    if (event.target == modal) 
-                    {
-                        // Close modal container and slide out window
-                        modal.style.display = "none";
-                        document.getElementById("slideout").classList.toggle("on");
-
-                        // Replace child data in text area with new child data
-                        document.getElementById("mainTextArea").children[songMetaData.childIndex].outerHTML =
-                        `<div class="textAreaSongItem">
-                            ${songMetaData.songFileName} </br>
-                            -------------------</br>
-                            <table>
-                                <td>
-                                    <img src="${document.getElementById("songEditImage").src}" width="100" height="100">
-                                </td>
-                                <td class="wideMiddleTableColumn">
-                                    Title: ${document.getElementById("songEditTitle").value}</br>
-                                    Artist: ${document.getElementById("songEditArtist").value}</br>
-                                    Album: ${document.getElementById("songEditAlbum").value}</br>
-                                </td>
-                                <td>
-                                    <i class="fa fa-pencil-square-o hoverMe" aria-hidden="true" onclick="openSongEditSideBar(${childIndexInSongFiles});"></i>
-                                </td>
-                            </table>
-                        </div>`
-
-                        // Update song meta data list
-                        songMetaData.songName = document.getElementById("songEditTitle").value;
-                        songMetaData.artistName = document.getElementById("songEditArtist").value;
-                        songMetaData.albumName = document.getElementById("songEditAlbum").value;
-                        songMetaData.albumImage = document.getElementById("songEditImage").src;
-
-                        // Clear out saved song search data from list
-                        listOfSongSearchedData = [];
-                    }
-                }
-            }
-
-            // Function to disable buttons and return promise
-            function makeButtonsDisabled(buttonToDisable) {
-                return new Promise((resolve) => 
-                {
-                    // Get buttons of sidenav
-                    var sidenav = document.getElementById("sideNav");
-
-                    // If index greater than child length disable all
-                    if (buttonToDisable > sidenav.children.length - 1)
-                    {
-                        for (var child of sidenav.children)
-                        {
-                            child.style.backgroundColor = "rgb(17, 138, 80)";
-                            child.removeAttribute("onclick");
-                        }
-                    }
-                    // Else disable specific child only
-                    else
-                    {
-                        sidenav.children[buttonToDisable].style.backgroundColor = "rgb(17, 138, 80)";
-                        sidenav.children[buttonToDisable].removeAttribute("onclick");
-                    }
-
-                    // It doesn't work without timeout smh
-                    setTimeout(() => 
-                    {
-                        resolve("resolved");
-                    }, 500);
-                });
-            }
-
-            // Function to reenable side buttons
-            function makeButtonsEnabled(buttonToEnable)
-            {
-                // Get buttons of sidenav
-                var sidenav = document.getElementById("sideNav");
-
-                // If index greater than child length enable all
-                if (buttonToEnable > sidenav.children.length - 1)
-                {
-                    var buttonIndex = 0;
-                    for (let button of sidenav.children)
-                    {
-                        button.style.backgroundColor = "rgb(41, 194, 122)";
-                        button.setAttribute("onclick", "doButtonAction(" + buttonIndex.toString() + ")");
-                        buttonIndex += 1;
-                    }
-                }
-                // Else only enable specific child
-                else
-                {
-                    sidenav.children[buttonToEnable].style.backgroundColor = "rgb(41, 194, 122)";
-                    sidenav.children[buttonToEnable].setAttribute("onclick", "doButtonAction(" + buttonToEnable + ")");
-                }
-            }
-
-            // Async call to scan songs
-            async function scanSongs()
-            {
-                // Wait for buttons to get disabled
-                const result = await makeButtonsDisabled(4);
-
-                // Go through songs and scan
-                var mainTextArea = document.getElementById("mainTextArea");
-                for (let child of mainTextArea.children)
-                {
-                    // Clean song name
-                    var cleanedSongName = child.innerHTML.replace(".mp3", "")
-                    cleanedSongName = cleanedSongName.replaceAll(" ", "+");
-                    cleanedSongName = cleanedSongName.replace('[', '(');
-                    cleanedSongName = cleanedSongName.replace(']', ')');
-                    while (cleanedSongName.includes("(")) 
-                    {
-                        cleanedSongName = cleanedSongName.replace(/ *\([^)]*\) */g, "");
-                    }
-
-                    // Get song meta data and edit main text area
-                    getSongMetaData(cleanedSongName).then(songMetaData =>
-                    {
-                        // Update data and add to song data list
-                        songMetaData["songFullFileName"] = document.getElementById("folderText").innerHTML + "/" + child.innerHTML.trim();
-                        songMetaData["childIndex"] = Array.prototype.indexOf.call(mainTextArea.children, child);
-                        songMetaData["songFileName"] = child.innerHTML;
-                        var chidlCurrentIndex = listOfSongFilesData.push(songMetaData) - 1;
-
-                        // Change song's html in text box
-                        child.outerHTML =
-                        `<div class="textAreaSongItem">
-                            ${child.innerHTML} </br>
-                            -------------------</br>
-                            <table>
-                                <td>
-                                    <img src="${songMetaData.albumImage}" width="100" height="100">
-                                </td>
-                                <td class="wideMiddleTableColumn">
-                                    Title: ${songMetaData.songName}</br>
-                                    Artist: ${songMetaData.artistName}</br>
-                                    Album: ${songMetaData.albumName}</br>
-                                </td>
-                                <td>
-                                    <i class="fa fa-pencil-square-o hoverMe" aria-hidden="true" onclick="openSongEditSideBar(${chidlCurrentIndex});"></i>
-                                </td>
-                            </table>
-                        </div>`
-                    })
-                }
-
-                // Reenable side buttons except for scan
-                makeButtonsEnabled(4);
-                makeButtonsDisabled(1);
-            }
-
-            // Async call to save songs
-            async function saveSongs()
-            {
-                // Wait for buttons to get disabled
-                const result = await makeButtonsDisabled(4);
-
-                ipc.once("songsSavedSuccessfully", function(event, successResponse)
-                {
-                    alert("Files saved successfully!");
-                    // Reenable side buttons
-                    makeButtonsEnabled(4);
-                });
-
-                // API call in main.js
-                ipc.send("saveSongs", listOfSongFilesData);
-            }
+        // Display success message
+        function successMessage(text)
+        {
+            // Create divs
+            var msgDiv = document.getElementById("serverMessage");
+            var msg = document.createElement("div");
+            msg.setAttribute("class", "successMessage");
+            msg.appendChild(document.createTextNode("Success! " + text));
             
-            // Get song meta data
-            const getSongMetaData = async (songFileName) =>
+            // Remove prev message
+            try
             {
-                // Use spotify api endpoint to get token
-                var result = await fetch("https://accounts.spotify.com/api/token", 
-                {
-                    method: "POST",
-                    headers: 
-                    {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Authorization": "Basic " + btoa(clientId + ":" + clientSecret)
-                    },
-                    body: "grant_type=client_credentials"
-                })
+                msgDiv.removeChild(msgDivMsg);
+            }
+            catch (error) {}
+            
+            msgDiv.appendChild(msg);
+            msgDivMsg = msg;
 
-                // Get token
-                var data = await result.json()
-                token = data.access_token;
+            // Clear message
+            setTimeout(function ()
+            {
+                msgDiv.removeChild(msg);
+            }, 1500);
+        };
 
-                // Use spotify api to search by track
-                var result = await fetch(`https://api.spotify.com/v1/search?q=${songFileName}&type=track`,
-                {
-                    method: "GET",
-                    headers: {"Authorization": "Bearer " + token}
-                })
+        // Display error message
+        function errorMessage(text)
+        {
+            // Create divs
+            var msgDiv = document.getElementById("serverMessage");
+            var msg = document.createElement("div");
+            msg.setAttribute("class", "errorMessage");
+            msg.appendChild(document.createTextNode("Error! " + text));
 
-                // Get meta data
-                var data = await result.json()
+            // Remove prev message
+            try
+            {
+                msgDiv.removeChild(msgDivMsg);
+            }
+            catch (error) {}
+            
+            msgDiv.appendChild(msg);
+            msgDivMsg = msg;
+
+            // Clear message
+            setTimeout(function ()
+            {
+                msgDiv.removeChild(msg);
+            }, 1500);
+        };
+
+        // Update profile header
+        function updateProfileHeader()
+        {
+            // Set profile header
+            document.getElementById("userProfileName").innerHTML = tutorData["FirstName"] + " " + tutorData["LastName"];
+            document.getElementById("userProfileEmail").innerHTML = tutorData["Email"];
+            document.getElementById("userProfilePhone").innerHTML = tutorData["PhoneNumber"];
+        }
+
+        // Recieve user selected folder path
+        ipc.on("getFolderPathReply", function(event, folderFullPath)
+        {
+            folderPath.value = folderFullPath;
+            ipc.send("getFilesInFolder", folderFullPath);
+        });
+
+        // Get list of files in folder
+        ipc.on("getFilesInFolderReply", function(event, files)
+        {
+            // Set length
+            fileCount = files.length;
+
+            // Clear text area
+            folderFiles.innerHTML = "";
+
+            // Go through list of files and add to text area
+            for (let i = 0; i < files.length; i++) 
+            {
+                folderFiles.innerHTML +=
+                `<div id="song${i}" class="mb-3">
+                    <div style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                        ${files[i]}
+                    </div>
+                    <div class="row" data-file-name="${files[i]}"
+                    data-song-image="" data-song-title="" data-song-artist="" data-song-album="">
+                        <div style="padding-left: 15px;">
+                            <img src="" width="65" height="65">
+                        </div>
+                        <div class="col-6" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                            Title: </br>
+                            Artist: </br>
+                            Album: </br>
+                        </div>
+                        <div class="col-3">
+                            </br>
+                            <a onclick="copySongToTrack(this.parentElement.parentElement)" style="cursor: pointer;">
+                                <i class="mdi mdi-content-copy text-primary"></i>
+                            </a>
+                            <a onclick="selectTrack(this.parentElement.parentElement)" style="cursor: pointer;">
+                                <i class="mdi mdi-chevron-double-right text-dark"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            // Get metadata for songs
+            if (files.length > 0)
+            {
+                scanSongs();
+            }
+        });
+
+        // Append download output 
+        ipc.on("downloadOutput", function(event, output)
+        {
+            downloadLogs.innerHTML += `<p style="font-size: 13px">${output}</p>`;
+            downloadLogs.scrollTop = downloadLogs.scrollHeight;
+        });
+
+        // Recieve download completed
+        ipc.on("downloadCompleted", function(event, code)
+        {
+            // Stop spinner
+            document.getElementById("downloadLogo").classList.remove("mdi-spin");
+
+            if (code == 0)
+            {
+                successMessage("Download Completed!");
+                ipc.send("getFolderPath", {});
+            }
+            else
+            {
+                errorMessage("Download Failed!");
+            }
+        });
+
+        // Receive song search results
+        ipc.on("songSearchResults", function(event, songResultList)
+        {
+            // Clear html on each new search
+            spotifyResults.innerHTML = "";
+            document.getElementById("spotifyLogo").classList.remove("mdi-spin");
+
+            // Go through all tracks in response
+            for (let i = 0; i < songResultList.tracks.items.length; i++)
+            {
+                // Get individual response song's meta data and push into list data
                 var songMetaData = 
                 {
-                    "songName": data.tracks.items[0].name,
-                    "albumName": data.tracks.items[0].album.name,
-                    "artistName": data.tracks.items[0].artists[0].name,
-                    "albumImage": data.tracks.items[0].album.images[0].url
+                    "songName": songResultList.tracks.items[i].name,
+                    "albumName": songResultList.tracks.items[i].album.name,
+                    "artistName": songResultList.tracks.items[i].artists[0].name,
+                    "albumImage": songResultList.tracks.items[i].album.images[0].url
                 }
-                return songMetaData;
-            }
-            
-            // Whenever output udpated show in text box
-            ipc.on("downloadInProgress", function(event, newOutput)
-            {
-                var downloadBox = document.getElementById("slideoutTextArea");
-                downloadBox.innerHTML += `<p>${newOutput}</p>`;
-                downloadBox.scrollTop = downloadBox.scrollHeight;
-            });
-            
-            // If user presses enter on youtube link search bar
-            var youtubeLink = document.getElementById("youtubeLink");
-            youtubeLink.addEventListener("keypress", function(event)
-            {
-                if (event.key === "Enter") 
-                {
-                    // Simulate download button click
-                    document.getElementById("youtubeLinkDownloadButton").click();
-                }
-            });
 
-            // If user presses enter on spotify search bar
-            var spotifySearchInput = document.getElementById("spotifySearchInput");
-            spotifySearchInput.addEventListener("keypress", function(event)
+                // Create and add song's html for text box
+                spotifyResults.innerHTML +=
+                `<div class="row mb-3 button-hover" onclick="selectSong(this)" style="cursor: pointer;">
+                    <div class="col-2">
+                        <img src="${songMetaData.albumImage}" width="65" height="65">
+                    </div>
+                    <div class="col-10" style="white-space: nowrap;">
+                        Title: ${songMetaData.songName}</br>
+                        Artist: ${songMetaData.artistName}</br>
+                        Album: ${songMetaData.albumName}</br>
+                    </div>
+                </div>`;
+            }
+        });
+
+        // Receive song scan result
+        ipc.on("songScanResult", function(event, songResults, index)
+        {
+            // Use only most relevant result
+            var songMetaData =
             {
-                if (event.key === "Enter") 
+                "songName": songResults.tracks.items[0].name,
+                "albumName": songResults.tracks.items[0].album.name,
+                "artistName": songResults.tracks.items[0].artists[0].name,
+                "albumImage": songResults.tracks.items[0].album.images[0].url
+            }
+
+            // Get song div
+            child = folderFiles.children[index];
+            var songDiv = child.children[1];
+
+            // Set song metadata fields
+            songDiv.setAttribute("data-song-image", songMetaData.albumImage);
+            songDiv.setAttribute("data-song-title", songMetaData.songName);
+            songDiv.setAttribute("data-song-artist", songMetaData.artistName);
+            songDiv.setAttribute("data-song-album", songMetaData.albumName);
+
+            songDiv.children[0].getElementsByTagName("img")[0].src = songMetaData.albumImage;
+            songDiv.children[1].innerHTML =
+            `Title: ${songMetaData.songName}</br>
+            Artist: ${songMetaData.artistName}</br>
+            Album: ${songMetaData.albumName}</br>`;
+        });
+
+        // Receive songs saved response
+        ipc.on("songsSavedResponse", function(event, successResponse)
+        {
+            if (successResponse == 0)
+            {
+                successMessage("Files saved!");
+            }
+            else
+            {
+                errorMessage("Files not saved!");
+            }
+        });
+
+        // Receive song search failure
+        ipc.on("songSearchFail", function(event, message)
+        {
+            // Show fail
+            spotifyResults.innerHTML = "";
+            document.getElementById("spotifyLogo").classList.remove("mdi-spin");
+            errorMessage(message);
+        });
+
+        // Receive song search failure
+        ipc.on("songScanFail", function(event, message)
+        {
+            // Show fail
+            errorMessage(message);
+        });
+
+        // Receive songs delete response
+        ipc.on("deleteAllSongsResponse", function(event, successResponse)
+        {
+            if (successResponse == 0)
+            {
+                successMessage("All songs deleted.");
+                folderFiles.innerHTML = "";
+            }
+            else            {
+                errorMessage("Couldn't delete songs!");
+            }
+        });
+
+        // Save songs metadata
+        function saveSongs()
+        {
+            var fileList = [];
+            for (let i = 0; i < folderFiles.children.length; i++)
+            {
+                fileList.push(
                 {
-                    // Simulate download button click
-                    document.getElementById("spotifySearchButton").click();
+                    "songFullFileName": folderPath.value + "/" + folderFiles.children[i].children[1].getAttribute("data-file-name"),
+                    "albumImage": folderFiles.children[i].children[1].getAttribute("data-song-image"),
+                    "songName": folderFiles.children[i].children[1].getAttribute("data-song-title"),
+                    "artistName": folderFiles.children[i].children[1].getAttribute("data-song-artist"),
+                    "albumName": folderFiles.children[i].children[1].getAttribute("data-song-album"),
+                });
+            }
+
+            if (fileList.length == 0)
+            {
+                errorMessage("No files to save!");
+            }
+            else
+            {
+                ipc.send("saveSongs", fileList);
+            }
+        }
+
+        // Get metadata for songs
+        function scanSongs()
+        {
+            if (folderFiles.children.length == 0)
+            {
+                errorMessage("No files to scan!");
+                return;
+            }
+
+            for (let i = 0; i < folderFiles.children.length; i++)
+            {
+                // Get song div
+                child = folderFiles.children[i];
+                var songDiv = child.children[1];
+
+                // Clean song name for spotify search
+                var cleanedSongName = songDiv.getAttribute("data-file-name").replace(".mp3", "")
+                cleanedSongName = cleanedSongName.replace('{', '(');
+                cleanedSongName = cleanedSongName.replace('}', '(');
+                cleanedSongName = cleanedSongName.replace('[', '(');
+                cleanedSongName = cleanedSongName.replace(']', ')');
+                while (cleanedSongName.includes("(")) 
+                {
+                    cleanedSongName = cleanedSongName.replace(/ *\([^)]*\) */g, "");
                 }
-            });
-        </script>
-    </body>
+
+                ipc.send("scanSong", cleanedSongName, i);
+            }
+        }
+
+        // Delete songs from folder
+        function deleteSongs()
+        {
+            ipc.send("deleteAllSongs", {});
+        }
+
+        // Open songs folder
+        function openSongsFolder()
+        {
+            if (folderPath.value != "")
+            {
+                ipc.send("openSongsFolder", {});
+            }
+            else
+            {
+                errorMessage("No folder selected!");
+            }
+        }
+
+        // Select song from spotify area
+        function selectSong(songDiv)
+        {
+            trackMetaData = songDiv.children[1].innerHTML.split("<br>");
+            spotifyImage.src = songDiv.children[0].getElementsByTagName("img")[0].src;
+            spotifyTitle.value = trackMetaData[0].trim().replace("Title: ", "").replace("&amp;", "&");
+            spotifyArtist.value = trackMetaData[1].trim().replace("Artist: ", "").replace("&amp;", "&");
+            spotifyAlbum.value = trackMetaData[2].trim().replace("Album: ", "").replace("&amp;", "&");
+        }
+
+        // Select track from folder area
+        function selectTrack(songDiv)
+        {
+            // Clean song name for spotify search
+            var cleanedSongName = songDiv.getAttribute("data-file-name").replace(".mp3", "")
+            cleanedSongName = cleanedSongName.replace('{', '(');
+            cleanedSongName = cleanedSongName.replace('}', '(');
+            cleanedSongName = cleanedSongName.replace('[', '(');
+            cleanedSongName = cleanedSongName.replace(']', ')');
+            while (cleanedSongName.includes("(")) 
+            {
+                cleanedSongName = cleanedSongName.replace(/ *\([^)]*\) */g, "");
+            }
+
+            // Set song metadata fields
+            spotifyImage.src = songDiv.getAttribute("data-song-image")
+            spotifyTitle.value = songDiv.getAttribute("data-song-title");
+            spotifyArtist.value = songDiv.getAttribute("data-song-artist");
+            spotifyAlbum.value = songDiv.getAttribute("data-song-album");
+            spotifySearch.value = cleanedSongName;
+            searchSpotify();
+        }
+
+        // Copy song metadata to track
+        function copySongToTrack(songDiv)
+        {
+            songDiv.setAttribute("data-song-image", spotifyImage.src);
+            songDiv.setAttribute("data-song-title", spotifyTitle.value);
+            songDiv.setAttribute("data-song-artist", spotifyArtist.value);
+            songDiv.setAttribute("data-song-album", spotifyAlbum.value);
+
+            songDiv.children[0].getElementsByTagName("img")[0].src = spotifyImage.src;
+            songDiv.children[1].innerHTML =
+            `Title: ${spotifyTitle.value}</br>
+            Artist: ${spotifyArtist.value}</br>
+            Album: ${spotifyAlbum.value}</br>`;
+        }
+
+        // Function to run when profile settings item is clicked
+        function profileMenuNav(buttonToMakeActive, elementsToMakeVisible, functionToRun)
+        {
+            // Get admin body area
+            var profileBodyArea = document.getElementById("profileBodyArea");
+            document.getElementById(currentProfileButton).className = "nav-link";
+            document.getElementById(buttonToMakeActive).className = "nav-link active";
+            currentProfileButton = buttonToMakeActive;
+
+            // Go through children
+            for (let i = 0; i < profileBodyArea.children.length; i++)
+            {
+                if (elementsToMakeVisible.includes(i))
+                {
+                    profileBodyArea.children[i].style.display = "block";
+                }
+                else
+                {
+                    profileBodyArea.children[i].style.display = "none";
+                }
+            }
+
+            // Run function
+            setTimeout(function() {window[functionToRun]();}, asyncFunctionTimeout);
+        }
+
+        // Function to run when menu item is clicked
+        function menuNav(dashboardName, functionToRun)
+        {
+            // Hide old dashboard show new and adjust current dashboard var accordingly
+            document.getElementById(currentDashboard).style.display = "none";
+            document.getElementById(dashboardName).style.display = "block";
+            currentDashboard = dashboardName;
+
+            // Run function
+            setTimeout(function() {window[functionToRun]();}, asyncFunctionTimeout);
+        }
+    
+        // Function listener for enter on download link
+        downloadLink.addEventListener("keypress", function(event)
+        {
+            if (event.key == "Enter") 
+            {
+                downloadLogs.innerHTML = "";
+                document.getElementById("downloadLogo").classList.add("mdi-spin");
+                ipc.send("downloadFromLink", downloadLink.value);
+            }
+        });
+
+        // Function listerner for enter on spotify search
+        spotifySearch.addEventListener("keypress", function(event)
+        {
+            if (event.key == "Enter")
+            {
+                searchSpotify();
+            }
+        });
+
+        // Show spotify image when it has a src
+        spotifyImage.addEventListener("load", function()
+        {
+            spotifyImage.style.visibility = "visible";
+        });
+
+        // Search spotify
+        function searchSpotify()
+        {
+            spotifyResults.innerHTML = "";
+            spotifyResults.innerHTML +=
+            `<div class="row mb-3">
+                <div class="col-2">
+                    <img src="" width="65" height="65">
+                </div>
+                <div class="col-10" style="white-space: nowrap;">
+                    Title: </br>
+                    Artist: </br>
+                    Album: </br>
+                </div>
+            </div>`;
+
+            document.getElementById("spotifyLogo").classList.add("mdi-spin");
+            ipc.send("searchSong", spotifySearch.value);
+        }
+    </script>
 </html>

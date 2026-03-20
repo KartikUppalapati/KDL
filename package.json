@@ -1,5 +1,5 @@
 {
-  "name": "KartsDL",
+  "name": "kartsdl",
   "productName": "KartsDL",
   "version": "1.0.0",
   "description": "Application to donwload songs from youtube, get their metadata, and save them",
@@ -9,7 +9,18 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "echo \"No linting configured\""
+    "lint": "echo \"No linting configured\"",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.karts.kartsDL",
+    "productName": "KartsDL",
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+
+    }
   },
   "keywords": [],
   "author": "kartikuppalapati",
@@ -24,6 +35,7 @@
     "@electron-forge/maker-squirrel": "^6.4.2",
     "@electron-forge/maker-zip": "^6.4.2",
     "@electron-forge/plugin-auto-unpack-natives": "^6.4.2",
-    "electron": "27.0.3"
+    "electron": "27.0.3",
+    "electron-builder": "^24.9.1"
   }
 }

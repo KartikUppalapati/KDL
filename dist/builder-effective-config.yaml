@@ -1,0 +1,10 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.karts.kartsDL
+productName: KartsDL
+win:
+  target: nsis
+mac: {}
+files: []
+electronVersion: 27.0.3

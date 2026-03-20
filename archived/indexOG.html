@@ -1,0 +1,629 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <title>KartsDL</title>
+        <link rel="stylesheet" href="index.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    </head>
+    <body>
+        <!-- Side Area -->
+        <div id="sideNav" class="sidenav">
+            <label id="downloadButton" class="" onclick="download()">Download</label>
+            <label id="scanButton" class="" onclick="scan()">Scan</label>
+            <label id="saveButton" class="" onclick="save()">Save</label>
+            <label id="openFolderButton" class="cursor" onclick="openFolder(false)">Choose Folder</label>
+        </div>
+
+        <!-- Main Area -->
+        <div id="mainTextArea" class="mainTextArea">
+        </div>
+
+        <!-- Folder Text Area -->
+        <div class="folderTextArea">
+            <p id="folderText"></p>
+        </div>
+
+        <!-- Modal Areas -->
+        <div id="onlyBackgroundModal" class="modal">
+        </div>
+        <div id="slideout">
+            <!-- Main Song Area -->
+            <table id="slideoutTable">
+                <td>
+                    <img id="songEditImage" src="" width="115" height="115">
+                </td>
+                <td class="wideMiddleTableColumn" style="padding: 10px;">
+                    <input id="songEditTitle" type="text" class="slideoutInput"></br>
+                    <input id="songEditArtist" type="text" class="slideoutInput"></br>
+                    <input id="songEditAlbum" type="text" class="slideoutInput"></br>
+                </td>
+            </table>
+
+            <!-- Header Text -->
+            <h1 id="slideoutHeader"></h1>
+
+            <!-- Downloand Link Area -->
+            <div id="downloadDiv">
+                <input id="youtubeLink" class="searchBar" type="text"/>
+                <button id="youtubeLinkDownloadButton" class="searchButton" onclick="downloadYoutubeLink()">
+                    <i class="fa fa-download"></i>
+                </button>
+            </div>
+
+            <!-- Search Song Area -->
+            <div id="spotifyDiv">
+                <input id="spotifySearchInput" class="searchBar" type="text"/>
+                <button id="spotifySearchButton" class="searchButton" onclick="searchSong()">
+                    <i class="fa fa-search"></i>
+                </button>
+            </div>
+
+            <!-- Text Area -->
+            <div id="slideoutTextArea" class="slideoutTextAreaClass"></div>
+        </div>
+    </body>
+
+    <script>
+        // Variable stuff
+        var numSongs = 0;
+        var canSave = true;
+        var canScan = true;
+        var canDownload = true;
+        var canOpenFolder = true;
+        var listOfSongFilesData = [];
+        var ipc = require('electron').ipcRenderer;
+        const clientId = "6d3c6efcc74b4891981593966033ec76"
+        const clientSecret = "530dcb7cc7dd43e2bf0e5ff4ebad6be2"
+
+        // Get default saved folder
+        openFolder(true);
+
+        // Function to turn onoff
+        // buttons based on button state
+        function updateAppCurrentState()
+        {
+            saveButton = document.getElementById("saveButton");
+            scanButton = document.getElementById("scanButton");
+            downloadButton = document.getElementById("downloadButton");
+            openFolderButton = document.getElementById("openFolderButton");
+
+            saveButtonDisabled = saveButton.classList.contains("disabled")
+            scanButtonDisabled = scanButton.classList.contains("disabled")
+            downloadButtonDisabled = downloadButton.classList.contains("disabled")
+            openFolderButtonDisabled = openFolderButton.classList.contains("disabled")
+
+            if ((canSave == false && saveButtonDisabled == false) ||
+            (canSave == true && saveButtonDisabled == true))
+            {
+                saveButton.classList.toggle("disabled");
+            }
+            if ((canScan == false && scanButtonDisabled == false) ||
+            (canScan == true && scanButtonDisabled == true))
+            {
+                scanButton.classList.toggle("disabled");
+            }
+            if ((canDownload == false && downloadButtonDisabled == false) ||
+            (canDownload == true && downloadButtonDisabled == true))
+            {
+                downloadButton.classList.toggle("disabled");
+            }
+            if ((canOpenFolder == false && openFolderButtonDisabled == false) ||
+            (canOpenFolder == true && openFolderButtonDisabled == true))
+            {
+                openFolderButton.classList.toggle("disabled");
+            }
+        }
+
+        // Scan function
+        function scan()
+        {
+            // Update state
+            canSave = false;
+            canScan = false;
+            canDownload = false;
+            canOpenFolder = false;
+            updateAppCurrentState();
+            
+            // Go through songs and scan
+            var mainTextArea = document.getElementById("mainTextArea");
+            for (let child of mainTextArea.children)
+            {
+                // Clean song name
+                var cleanedSongName = child.innerHTML.replace(".mp3", "")
+                cleanedSongName = cleanedSongName.replaceAll(" ", "+");
+                cleanedSongName = cleanedSongName.replace('{', '(');
+                cleanedSongName = cleanedSongName.replace('}', '(');
+                cleanedSongName = cleanedSongName.replace('[', '(');
+                cleanedSongName = cleanedSongName.replace(']', ')');
+                while (cleanedSongName.includes("(")) 
+                {
+                    cleanedSongName = cleanedSongName.replace(/ *\([^)]*\) */g, "");
+                }
+
+                // Get song meta data and edit main text area
+                getSongMetaData(cleanedSongName).then(songMetaData =>
+                {
+                    // Update data and add to song data list
+                    songMetaData["songFullFileName"] = document.getElementById("folderText").innerHTML + "/" + child.innerHTML.trim();
+                    songMetaData["childIndex"] = Array.prototype.indexOf.call(mainTextArea.children, child);
+                    songMetaData["songFileName"] = child.innerHTML;
+                    var chidlCurrentIndex = listOfSongFilesData.push(songMetaData) - 1;
+
+                    // Change song's html in text box
+                    child.outerHTML =
+                    `<div class="textAreaSongItem">
+                        ${child.innerHTML} </br>
+                        -------------------</br>
+                        <table>
+                            <td>
+                                <img src="${songMetaData.albumImage}" width="100" height="100">
+                            </td>
+                            <td class="wideMiddleTableColumn">
+                                Title: ${songMetaData.songName}</br>
+                                Artist: ${songMetaData.artistName}</br>
+                                Album: ${songMetaData.albumName}</br>
+                            </td>
+                            <td>
+                                <i class="fa fa-pencil-square-o hoverMe" aria-hidden="true" onclick="openSongEditSideBar(${chidlCurrentIndex});"></i>
+                            </td>
+                        </table>
+                    </div>`
+                })
+            }
+
+            // Update state
+            canSave = true;
+            canScan = true;
+            canDownload = true;
+            canOpenFolder = true;
+            updateAppCurrentState();
+        }
+
+        // Save function
+        function save()
+        {
+            // Update state
+            canSave = false;
+            canScan = false;
+            canDownload = false;
+            canOpenFolder = false;
+            updateAppCurrentState();
+
+            // Reply
+            ipc.once("songsSavedSuccessfully", function(event, successResponse)
+            {
+                // Message
+                alert("Files saved successfully!");
+
+                // Update state
+                canSave = true;
+                canScan = true;
+                canDownload = true;
+                canOpenFolder = true;
+                updateAppCurrentState();
+            });
+
+            // API call in main.js
+            ipc.send("saveSongs", listOfSongFilesData);
+        }
+
+        // Open folder function
+        function openFolder(defaultPathRequested)
+        {
+            // Update state
+            canSave = false;
+            canScan = false;
+            canDownload = false;
+            canOpenFolder = false;
+            updateAppCurrentState();
+
+            // Recieve user selected folder path from api
+            ipc.once("openFolderDialogReply", function(event, folderFullPath)
+            {
+                if (folderFullPath != undefined)
+                {
+                    document.getElementById("folderText").innerHTML = folderFullPath;
+                    ipc.send("getFilesInFolder", folderFullPath);
+                }
+                else
+                {
+                    // Update state
+                    canSave = false;
+                    canScan = false;
+                    canDownload = false;
+                    canOpenFolder = true;
+                    updateAppCurrentState();
+                }
+            });
+
+            // Get list of files in folder from api
+            ipc.once("getFilesInFolderReply", function(event, listOfFiles)
+            {
+                // Set numSongs variable
+                numSongs = listOfFiles.length;
+
+                // Clear text area
+                document.getElementById("mainTextArea").innerHTML = "";
+
+                // Go through list of files and add to text area
+                for (let i = 0; i < listOfFiles.length; i++) 
+                {
+                    document.getElementById("mainTextArea").innerHTML +=
+                    `<div id="song${i}" class="textAreaSongItem">
+                        ${listOfFiles[i]}
+                    </div>`;
+                }
+
+                // Update state
+                if (numSongs > 0)
+                {
+                    canScan = true;
+                }
+                canSave = false;
+                canDownload = true;
+                canOpenFolder = true;
+                updateAppCurrentState();
+            });
+            
+            // Send api request call to main.js
+            ipc.send("openFolderDialog", {"defaultPathRequested": defaultPathRequested});
+        };
+
+        // Download function
+        function download()
+        {
+            // Update state
+            canSave = false;
+            canScan = false;
+            canDownload = false;
+            canOpenFolder = false;
+            updateAppCurrentState();
+
+            // Set header text
+            document.getElementById("slideoutHeader").innerHTML = "Enter Youtube Link";
+
+            // Open background modal
+            document.getElementById("slideoutTextArea").innerHTML = "";
+            document.getElementById("onlyBackgroundModal").style.display = "block";
+
+            // Open editing side bar and make ready for download
+            document.getElementById("slideout").classList.toggle("on");
+            document.getElementById("slideoutTable").style.display = "none";
+            document.getElementById("spotifySearchInput").style.display = "none";
+            document.getElementById("spotifySearchButton").style.display = "none";
+            document.getElementById("slideoutHeader").style.display = "block";
+            document.getElementById("slideoutTextArea").style.marginTop = "15";
+            document.getElementById("slideoutTextArea").style.height = "65%";
+
+            // On click outside make slide out go away
+            var modal = document.getElementById("onlyBackgroundModal");
+            window.onclick = function(event) 
+            {
+                if (event.target == modal) 
+                {
+                    modal.style.display = "none";
+                    slideoutDissappear();
+
+                    // Update state
+                    canSave = false;
+                    canScan = true;
+                    canDownload = true;
+                    canOpenFolder = true;
+                    updateAppCurrentState();
+                }
+            }
+        }
+
+        // When download button pressed
+        function downloadYoutubeLink()
+        {
+            // Change header and disable click away
+            document.getElementById("slideoutHeader").innerHTML = "Download In Progress";
+            document.getElementById("slideoutTextArea").innerHTML = "";
+            var modal = document.getElementById("onlyBackgroundModal");
+            window.onclick = function(event) 
+            {
+                if (event.target == modal) 
+                {
+                    modal.style.display = "block";
+                }
+            }
+
+            // API call to main.js
+            ipc.send("downloadYoutubeLink", document.getElementById("youtubeLink").value,
+            document.getElementById("folderText").innerHTML);
+
+            // Display things after unsuccessful download
+            ipc.once("downloadFail", function(event, data)
+            {
+                // Change header
+                document.getElementById("slideoutHeader").innerHTML = "Download Failed";
+
+                // On click away make slidout normal
+                var modal = document.getElementById("onlyBackgroundModal");
+                window.onclick = function(event) 
+                {
+                    if (event.target == modal) 
+                    {
+                        modal.style.display = "none";
+                        slideoutDissappear();
+                    }
+                }
+            });
+
+            // Get all files in folder after download complete
+            ipc.once("downloadSuccess", function(event, data)
+            {
+                // Get all new files
+                var folderFullPath = document.getElementById("folderText").innerHTML;
+                ipc.once("getFilesInFolderReply", function(event, listOfFiles)
+                {
+                    // Set numSongs variable
+                    numSongs = listOfFiles.length;
+
+                    // Clear text area
+                    document.getElementById("mainTextArea").innerHTML = "";
+
+                    // Go through list of files and add to text area
+                    for (let i = 0; i < listOfFiles.length; i++) 
+                    {
+                        document.getElementById("mainTextArea").innerHTML +=
+                        `<div id="song${i}" class="textAreaSongItem">
+                            ${listOfFiles[i]}
+                        </div>`;
+                    }
+
+                    // Make download button enabled and disable save button
+                    makeButtonsEnabled(0);
+                    makeButtonsDisabled(2);
+
+                    // If any songs then make scan button enabled
+                    if (numSongs > 0)
+                    {
+                        makeButtonsEnabled(1);
+                    }
+                });
+                ipc.send("getFilesInFolder", folderFullPath);
+                
+                // Change header
+                document.getElementById("slideoutHeader").innerHTML = "Download Completed";
+
+                // On click away make slidout normal
+                var modal = document.getElementById("onlyBackgroundModal");
+                window.onclick = function(event) 
+                {
+                    if (event.target == modal) 
+                    {
+                        modal.style.display = "none";
+                        slideoutDissappear();
+                    }
+                }
+            });
+        }
+
+        // Make slidout go away
+        function slideoutDissappear()
+        {
+            // Clear text area
+            document.getElementById("slideoutTextArea").innerHTML = "";
+            document.getElementById("slideoutHeader").innerHTML = "Download In Progress";
+
+            // Close editing side bar and make ready for download
+            document.getElementById("slideout").classList.toggle("on");
+            document.getElementById("slideoutTable").style.display = "block";
+            document.getElementById("spotifySearchInput").style.display = "block";
+            document.getElementById("spotifySearchButton").style.display = "block";
+            document.getElementById("slideoutHeader").style.display = "none";
+            document.getElementById("slideoutTextArea").style.marginTop = "4.2%";
+            document.getElementById("slideoutTextArea").style.height = "60%";
+        }
+
+        // When search button pressed
+        const searchSong = async () =>
+        {
+            // Use spotify api endpoint to get token
+            var result = await fetch("https://accounts.spotify.com/api/token", 
+            {
+                method: "POST",
+                headers: 
+                {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": "Basic " + btoa(clientId + ":" + clientSecret)
+                },
+                body: "grant_type=client_credentials"
+            })
+
+            // Get token
+            var data = await result.json()
+            token = data.access_token;
+
+            // Use spotify api to search by track
+            var result = await fetch(`https://api.spotify.com/v1/search?q=${document.getElementById("spotifySearchInput").value.replaceAll(" ", "+")}&type=track`,
+            {
+                method: "GET",
+                headers: {"Authorization": "Bearer " + token}
+            })
+
+            // Get response
+            var data = await result.json()
+
+            // Clear html on each new search
+            document.getElementById("slideoutTextArea").innerHTML = "";
+
+            // Go through all tracks in response
+            for (let i = 0; i < data.tracks.items.length; i++)
+            {
+                // Get individual response song's meta data and push into list data
+                var songMetaData = 
+                {
+                    "songName": data.tracks.items[i].name,
+                    "albumName": data.tracks.items[i].album.name,
+                    "artistName": data.tracks.items[i].artists[0].name,
+                    "albumImage": data.tracks.items[i].album.images[0].url
+                }
+
+                // Create and add song's html for text box
+                document.getElementById("slideoutTextArea").innerHTML +=
+                `<div class="textAreaSongItem" ondblclick="copyChosenTrack(this)">
+                    <table>
+                        <td>
+                            <img src="${songMetaData.albumImage}" width="50" height="50">
+                        </td>
+                        <td class="wideMiddleTableColumn">
+                            Title: ${songMetaData.songName}</br>
+                            Artist: ${songMetaData.artistName}</br>
+                            Album: ${songMetaData.albumName}</br>
+                        </td>
+                        <td>
+                            <i class="fa fa-clone hoverMe" aria-hidden="true" style="font-size: 15px;" onclick="copyChosenTrack(this.parentElement.parentElement)"></i>
+                        </td>
+                    </table>
+                </div>`;
+            }
+        }
+
+        // For song editing modal
+        function copyChosenTrack(songDiv)
+        {
+            console.log(songDiv);
+            trackMetaData = songDiv.children[1].innerHTML.split("<br>");
+            document.getElementById("songEditImage").src = songDiv.children[0].getElementsByTagName('img')[0].src;
+            document.getElementById("songEditTitle").value = trackMetaData[0].trim().replace("Title: ", "").replace("&amp;", "&");
+            document.getElementById("songEditArtist").value = trackMetaData[1].trim().replace("Artist: ", "").replace("&amp;", "&");
+            document.getElementById("songEditAlbum").value = trackMetaData[2].trim().replace("Album: ", "").replace("&amp;", "&");
+        }
+
+        // For song editing modal
+        function openSongEditSideBar(childIndexInSongFiles)
+        {
+            // Get the modal
+            var modal = document.getElementById("onlyBackgroundModal");
+
+            // Open the modal
+            document.getElementById("slideoutTextArea").innerHTML = "";
+            modal.style.display = "block";
+
+            // Get song meta data from input using list of song files data
+            var songMetaData = listOfSongFilesData[childIndexInSongFiles];
+            document.getElementById("songEditImage").src = songMetaData.albumImage;
+            document.getElementById("songEditTitle").value = songMetaData.songName;
+            document.getElementById("songEditArtist").value = songMetaData.artistName;
+            document.getElementById("songEditAlbum").value = songMetaData.albumName;
+            document.getElementById("spotifySearchInput").value = songMetaData.songFileName.replaceAll("&amp;", "&").trim();
+
+            // Hide download
+            document.getElementById("downloadDiv").style.display = "none";
+
+            // Open editing side bar
+            document.getElementById("slideout").classList.toggle("on");
+
+            // When user clicks outside modal
+            window.onclick = function(event) 
+            {
+                if (event.target == modal) 
+                {
+                    // Close modal container and slide out window
+                    modal.style.display = "none";
+                    document.getElementById("slideout").classList.toggle("on");
+
+                    // Replace child data in text area with new child data
+                    document.getElementById("mainTextArea").children[songMetaData.childIndex].outerHTML =
+                    `<div class="textAreaSongItem">
+                        ${songMetaData.songFileName} </br>
+                        -------------------</br>
+                        <table>
+                            <td>
+                                <img src="${document.getElementById("songEditImage").src}" width="100" height="100">
+                            </td>
+                            <td class="wideMiddleTableColumn">
+                                Title: ${document.getElementById("songEditTitle").value}</br>
+                                Artist: ${document.getElementById("songEditArtist").value}</br>
+                                Album: ${document.getElementById("songEditAlbum").value}</br>
+                            </td>
+                            <td>
+                                <i class="fa fa-pencil-square-o hoverMe" aria-hidden="true" onclick="openSongEditSideBar(${childIndexInSongFiles});"></i>
+                            </td>
+                        </table>
+                    </div>`
+
+                    // Update song meta data list
+                    songMetaData.songName = document.getElementById("songEditTitle").value;
+                    songMetaData.artistName = document.getElementById("songEditArtist").value;
+                    songMetaData.albumName = document.getElementById("songEditAlbum").value;
+                    songMetaData.albumImage = document.getElementById("songEditImage").src;
+
+                    // Clear out saved song search data from list
+                    listOfSongSearchedData = [];
+                }
+            }
+        }
+        
+        // Get song meta data
+        const getSongMetaData = async (songFileName) =>
+        {
+            // Use spotify api endpoint to get token
+            var result = await fetch("https://accounts.spotify.com/api/token", 
+            {
+                method: "POST",
+                headers: 
+                {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": "Basic " + btoa(clientId + ":" + clientSecret)
+                },
+                body: "grant_type=client_credentials"
+            })
+
+            // Get token
+            var data = await result.json()
+            token = data.access_token;
+
+            // Use spotify api to search by track
+            var result = await fetch(`https://api.spotify.com/v1/search?q=${songFileName}&type=track`,
+            {
+                method: "GET",
+                headers: {"Authorization": "Bearer " + token}
+            })
+
+            // Get meta data
+            var data = await result.json()
+            var songMetaData = 
+            {
+                "songName": data.tracks.items[0].name,
+                "albumName": data.tracks.items[0].album.name,
+                "artistName": data.tracks.items[0].artists[0].name,
+                "albumImage": data.tracks.items[0].album.images[0].url
+            }
+            return songMetaData;
+        }
+        
+        // Whenever output udpated show in text box
+        ipc.on("downloadInProgress", function(event, newOutput)
+        {
+            var downloadBox = document.getElementById("slideoutTextArea");
+            downloadBox.innerHTML += `<p>${newOutput}</p>`;
+            downloadBox.scrollTop = downloadBox.scrollHeight;
+        });
+        
+        // If user presses enter on youtube link search bar
+        var youtubeLink = document.getElementById("youtubeLink");
+        youtubeLink.addEventListener("keypress", function(event)
+        {
+            if (event.key === "Enter") 
+            {
+                // Simulate download button click
+                downloadYoutubeLink();
+            }
+        });
+
+        // If user presses enter on spotify search bar
+        var spotifySearchInput = document.getElementById("spotifySearchInput");
+        spotifySearchInput.addEventListener("keypress", function(event)
+        {
+            if (event.key === "Enter") 
+            {
+                // Simulate download button click
+                document.getElementById("spotifySearchButton").click();
+            }
+        });
+    </script>
+</html>
