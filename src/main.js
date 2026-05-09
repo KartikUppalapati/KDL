@@ -2,7 +2,6 @@ const { app, BrowserWindow, dialog, globalShortcut } = require('electron');
 const { exec, spawn } = require('node:child_process');
 var ipc = require('electron').ipcMain;
 const path = require('path');
-require('dotenv').config();
 const fs = require('fs');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -192,7 +191,7 @@ ipc.on("searchSong", function(event, songName)
         headers: 
         {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": "Basic " + btoa(process.env.SPOTIFY_CLIENT_ID + ":" + process.env.SPOTIFY_CLIENT_SECRET)
+            "Authorization": "Basic " + btoa("6d3c6efcc74b4891981593966033ec76:530dcb7cc7dd43e2bf0e5ff4ebad6be2")
         },
         body: "grant_type=client_credentials"
     })
@@ -226,7 +225,7 @@ ipc.on("scanSong", function(event, songName, index)
         headers: 
         {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": "Basic " + btoa(process.env.SPOTIFY_CLIENT_ID + ":" + process.env.SPOTIFY_CLIENT_SECRET)
+            "Authorization": "Basic " + btoa("6d3c6efcc74b4891981593966033ec76:530dcb7cc7dd43e2bf0e5ff4ebad6be2")
         },
         body: "grant_type=client_credentials"
     })
