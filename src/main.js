@@ -1,5 +1,5 @@
 const { app, BrowserWindow, dialog, globalShortcut } = require('electron');
-const { exec, spawn } = require('node:child_process');
+const { exec, execSync, spawn } = require('node:child_process');
 var ipc = require('electron').ipcMain;
 const path = require('path');
 const fs = require('fs');
@@ -166,12 +166,12 @@ ipc.on("saveSongs", function(event, songFileList)
         var songData = songFileList[i]
 
         // Save metadata using jar file
-        exec(`java -jar src/mp3Editer.jar "${songData.songFullFileName.replaceAll("&amp;", "&")}" "${songData.songName.replaceAll("&amp;", "&")}" "${songData.artistName.replaceAll("&amp;", "&")}" "${songData.albumName.replaceAll("&amp;", "&")}" ${songData.albumImage.replaceAll("&amp;", "&")}`,
+        exec(`java -jar src/dependencies/mp3Editer.jar "${songData.songFullFileName.replaceAll("&amp;", "&")}" "${songData.songName.replaceAll("&amp;", "&")}" "${songData.artistName.replaceAll("&amp;", "&")}" "${songData.albumName.replaceAll("&amp;", "&")}" ${songData.albumImage.replaceAll("&amp;", "&")}`,
         (error, stdout, stderr) =>
         {
             if (error) 
             {
-                // console.error(`saving exec error: ${error}`);
+                console.error(`saving exec error: ${error}`);
                 event.sender.send("songsSavedResponse", 1);
             }
             else
@@ -276,9 +276,10 @@ ipc.on("deleteAllSongs", function(event)
 
 ipc.on("downloadFromLink", function(event, link)
 {
-    // Spawn child process to download songs using yt-dlp
-    var commandArray = ["yt-dlp", "-i", "--ffmpeg-location", "/usr/local/bin/ffmpeg", "-x", "--audio-format", 
-    "mp3", "--sleep-interval", "5", "-o", defaultFolderPath + "'/%(title)s.%(ext)s'", link]
+    var ytdlpPath = path.join(__dirname, "dependencies", "yt-dlp");
+    var ffmpegPath = path.join(__dirname, "dependencies", "ffmpeg");
+    var commandArray = [ytdlpPath, "-i", "--ffmpeg-location", ffmpegPath, "-x", "--audio-format", 
+    "mp3", "--no-warnings", "--sleep-interval", "5", "-o", defaultFolderPath + "'/%(title)s.%(ext)s'", link]
     const download = exec(commandArray.join(" "));
 
     download.stdout.on("data", (output) =>

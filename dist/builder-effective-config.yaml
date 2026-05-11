@@ -1,8 +1,8 @@
 directories:
   output: dist
   buildResources: build
-appId: com.karts.kartsDL
-productName: KartsDL
+appId: com.karts.KDL
+productName: KDL
 win:
   target: nsis
 mac: {}
