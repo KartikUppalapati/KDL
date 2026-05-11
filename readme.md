@@ -10,9 +10,18 @@ SPOTIFY_CLIENT_SECRET="secret_here"
 
 ## Installation & Running
 
-Then run the following commands to install dependencies and start the application:
+Run the following commands to install dependencies and start the application:
 
 ```bash
 npm install
 npm run start
+```
+
+
+## Download
+
+Then run the following command to create an executable of the application:
+
+```bash
+npm run make
 ```

@@ -1,5 +1,5 @@
 const { app, BrowserWindow, dialog, globalShortcut } = require('electron');
-const { exec, execSync, spawn } = require('node:child_process');
+const { exec, spawn } = require('node:child_process');
 var ipc = require('electron').ipcMain;
 const path = require('path');
 const fs = require('fs');
@@ -83,8 +83,12 @@ app.on('activate', () =>
 
 
 // Init vars
-const platform = process.platform;
+const dependenciesPath = app.isPackaged ? path.join(process.resourcesPath, 'dependencies') : path.join(__dirname, 'dependencies');
 const defaultFolderPath = (process.env.HOME || process.env.USERPROFILE) + "/TempSongHolder";
+const mp3editorPath = path.join(dependenciesPath, 'mp3Editer.jar');
+const ffmpegPath = path.join(dependenciesPath, 'ffmpeg');
+const ytdlpPath = path.join(dependenciesPath, 'yt-dlp');
+const platform = process.platform;
 
 
 ipc.on("getFolderPath", function(event, data)
@@ -166,12 +170,12 @@ ipc.on("saveSongs", function(event, songFileList)
         var songData = songFileList[i]
 
         // Save metadata using jar file
-        exec(`java -jar src/dependencies/mp3Editer.jar "${songData.songFullFileName.replaceAll("&amp;", "&")}" "${songData.songName.replaceAll("&amp;", "&")}" "${songData.artistName.replaceAll("&amp;", "&")}" "${songData.albumName.replaceAll("&amp;", "&")}" ${songData.albumImage.replaceAll("&amp;", "&")}`,
+        exec(`java -jar ${mp3editorPath} "${songData.songFullFileName.replaceAll("&amp;", "&")}" "${songData.songName.replaceAll("&amp;", "&")}" "${songData.artistName.replaceAll("&amp;", "&")}" "${songData.albumName.replaceAll("&amp;", "&")}" ${songData.albumImage.replaceAll("&amp;", "&")}`,
         (error, stdout, stderr) =>
         {
             if (error) 
             {
-                console.error(`saving exec error: ${error}`);
+                // console.error(`saving exec error: ${error}`);
                 event.sender.send("songsSavedResponse", 1);
             }
             else
@@ -276,8 +280,6 @@ ipc.on("deleteAllSongs", function(event)
 
 ipc.on("downloadFromLink", function(event, link)
 {
-    var ytdlpPath = path.join(__dirname, "dependencies", "yt-dlp");
-    var ffmpegPath = path.join(__dirname, "dependencies", "ffmpeg");
     var commandArray = [ytdlpPath, "-i", "--ffmpeg-location", ffmpegPath, "-x", "--audio-format", 
     "mp3", "--no-warnings", "--sleep-interval", "5", "-o", defaultFolderPath + "'/%(title)s.%(ext)s'", link]
     const download = exec(commandArray.join(" "));

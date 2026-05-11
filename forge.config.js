@@ -1,6 +1,9 @@
 module.exports = {
   packagerConfig: {
     asar: true,
+    extraResource: [
+      './src/dependencies',
+    ],
   },
   rebuildConfig: {},
   makers: [
