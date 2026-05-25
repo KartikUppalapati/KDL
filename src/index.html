@@ -30,30 +30,83 @@
                         
                         <!-- Profile Area -->
                         <div class="navbar-right">
-                            <button class="nav nav-link button-hover" onclick="deleteSongs()">
+                            <button class="nav nav-link button-hover" onclick="deleteSongs()" data-toggle="tooltip" data-placement="right" title="Delete all songs">
                                 <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-delete"></i></h5>
                             </button>
-                            <button class="nav nav-link button-hover" onclick="scanSongs()">
+                            <button class="nav nav-link button-hover" onclick="scanSongs()" data-toggle="tooltip" data-placement="right" title="Scan all songs">
                                 <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-file-find"></i></h5>
                             </button>
-                            <button class="nav nav-link button-hover" onclick="saveSongs()">
+                            <button class="nav nav-link button-hover" onclick="openSongsFolder()" data-toggle="tooltip" data-placement="right" title="Open song folder">
+                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-folder-open"></i></h5>
+                            </button>
+                            <button class="nav nav-link button-hover" onclick="saveSongs()" data-toggle="tooltip" data-placement="right" title="Save songs">
                                 <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-content-save"></i></h5>
                             </button>
                         </div>
                     </nav>
                 </header>
 
-                <!-- Dashboard Areas -->
+                <!-- Main Areas -->
                 <div class="content-wrapper">
-                    <div class="content" style="height: 100%;">
-                        <div id="homeArea" style="height: 100%;">
-                            <div class="row" style="height: 100%;">
-                                <!-- Folder Area -->
-                                <div class="col-4">
-                                    <div class="card card-default" style="height: 95%;">
-                                        <div class="card-body mt-1">
-                                            <!-- Folder Path -->
+                    <div class="content">
+                        <div id="homeArea">
+                            <div class="row">
+                                <div class="col-7">
+                                    <!-- Download Area -->
+                                    <div class="card card-default">
+                                        <div class="card-body">
                                             <div class="input-group mb-0">
+                                                <!-- Download -->
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text">
+                                                        <i id="downloadLogo" class="mdi mdi-download"></i>
+                                                    </span>
+                                                </div>
+
+                                                <!-- Link -->
+                                                <input id="downloadLink" class="form-control" type="text">
+
+                                                <!-- Settings -->
+                                                <div class="input-group-append">
+                                                    <div class="dropdown">
+                                                        <p class="dropdown-toggle input-group-text" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                            <i id="downloadLogo" class="mdi mdi-settings"></i>
+                                                        </p>
+                                
+                                                        <div class="dropdown-menu" aria-labelledby="dropdownMenuLink" x-placement="bottom-end" style="position: absolute; transform: translate3d(0px, 40px, 0px); top: 0px; left: 0px; will-change: transform;">
+                                                            <h6 class="mt-2 ml-3 mb-2 mr-1" style="cursor: pointer;" onclick="settingsToggle('audioOnly')">
+                                                                audio-only
+                                                                <i id="audioOnlySetting" data-setting="1" class="mdi mdi-checkbox-marked-circle" style="color: var(--success);"></i>
+                                                            </h6>
+                                                            <h6 class="mt-2 ml-3 mb-2 mr-1" style="cursor: pointer;" onclick="settingsToggle('noWarnings')">
+                                                                no-warnings
+                                                                <i id="noWarningsSetting" data-setting="1" class="mdi mdi-checkbox-marked-circle" style="color: var(--success);"></i>
+                                                            </h6>
+                                                            <h6 class="mt-2 ml-3 mb-2 mr-1" style="cursor: pointer;" onclick="settingsToggle('ignoreErrors')">
+                                                                ignore-errors
+                                                                <i id="ignoreErrorsSetting" data-setting="1" class="mdi mdi-checkbox-marked-circle" style="color: var(--success);"></i>
+                                                            </h6>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Console Log -->
+                                            <div class="row mt-3">
+                                                <div class="col-12">
+                                                    <div id="downloadLogs">
+                                                        <p style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Enter youtube link above</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Folder Area -->
+                                    <div class="card card-default">
+                                        <div class="card-body">
+                                            <!-- Folder Path -->
+                                            <!-- <div class="input-group mt-3 mb-0">
                                                 <div class="input-group-prepend">
                                                     <span class="input-group-text">
                                                         <i class="mdi mdi-folder-open" style="cursor: pointer;" onclick="openSongsFolder()"></i>
@@ -61,12 +114,12 @@
                                                 </div>
                                                 <input id="folderPath" class="form-control"
                                                 style="pointer-events: none;" type="text">
-                                            </div>
+                                            </div> -->
 
                                             <!-- File List -->
-                                            <div class="row mt-3" style="height: 97%;">
+                                            <div class="row mt-3">
                                                 <div class="col-12">
-                                                    <div id="folderFiles" style="height: 62vh; overflow-y: auto;">
+                                                    <div id="folderFiles" style="height: 47.5vh; overflow-y: auto;">
                                                     </div>
                                                 </div>
                                             </div>
@@ -76,20 +129,20 @@
 
                                 <!-- Spotify Area -->
                                 <div class="col-5">
-                                    <div class="card card-default" style="height: 95%;">
+                                    <div class="card card-default">
                                         <div class="card-body mt-1">
                                             <!-- Song Metadata -->
-                                            <div class="row" style="height: 35%;">
+                                            <div class="row">
                                                 <!-- Album Image -->
-                                                <div class="col-5">
+                                                <div class="col-4">
                                                     <div>
-                                                        <img id="spotifyImage" src="" width="145" height="145">
+                                                        <img id="spotifyImage" src="" width="140" height="140">
                                                     </div>
                                                 </div>
 
                                                 <!-- Title, Artist, Album -->
-                                                <div class="col-7">
-                                                    <div class="card-default" style="height: 95%;">
+                                                <div class="col-8">
+                                                    <div class="card-default">
                                                         <!-- Title -->
                                                         <div class="input-group mb-1">
                                                             <div class="input-group-prepend">
@@ -134,34 +187,9 @@
                                             </div>
 
                                             <!-- Spotify Results -->
-                                            <div class="row mt-3 mb-3" style="height: 57%;">
+                                            <div class="row mt-3 mb-3">
                                                 <div class="col-12">
                                                     <div id="spotifyResults" style="height: 37vh; overflow-y: auto;">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Download Area -->
-                                <div class="col-3">
-                                    <div class="card card-default" style="height: 95%;">
-                                        <div class="card-body mt-1">
-                                            <!-- Video Link -->
-                                            <div class="input-group mb-0">
-                                                <div class="input-group-prepend">
-                                                    <span class="input-group-text">
-                                                        <i id="downloadLogo" class="mdi mdi-download"></i>
-                                                    </span>
-                                                </div>
-                                                <input id="downloadLink" class="form-control" type="text">
-                                            </div>
-
-                                            <!-- Console Log -->
-                                            <div class="row mt-3 mb-3" style="height: 97%;">
-                                                <div class="col-12">
-                                                    <div id="downloadLogs" style="height: 60vh; overflow-y: auto;">
                                                     </div>
                                                 </div>
                                             </div>
@@ -178,13 +206,11 @@
 
     <script>
         // Init stuff
-        var fileCount = 0;
         var msgDivMsg = null;
         var asyncFunctionTimeout = 200;
         var currentDashboard = "homeArea";
         var ipc = require("electron").ipcRenderer;
         var currentProfileButton = "profileInfoButton";
-        var folderPath = document.getElementById("folderPath");
         var folderFiles = document.getElementById("folderFiles");
         var downloadLink = document.getElementById("downloadLink");
         var downloadLogs = document.getElementById("downloadLogs");
@@ -194,9 +220,46 @@
         var spotifyArtist = document.getElementById("spotifyArtist");
         var spotifySearch = document.getElementById("spotifySearch");
         var spotifyResults = document.getElementById("spotifyResults");
+        var dropdownToggle = document.querySelector('.dropdown-toggle');
+        var dropdownMenu = document.querySelector('.dropdown-menu');
 
-        // Get files in default folder path
-        ipc.send("getFolderPath", {});
+        // Settings dropdown menu logic
+        if (dropdownToggle && dropdownMenu)
+        {
+            dropdownMenu.style.display = 'none';
+
+            dropdownToggle.addEventListener('click', function (event)
+            {
+                event.stopPropagation();
+                var isVisible = window.getComputedStyle(dropdownMenu).display !== 'none';
+
+                if (isVisible)
+                {
+                    dropdownMenu.style.display = 'none';
+                    dropdownMenu.classList.remove('show');
+                    dropdownToggle.setAttribute('aria-expanded', 'false');
+                }
+                else
+                {
+                    dropdownMenu.style.display = 'block';
+                    dropdownMenu.classList.add('show');
+                    dropdownToggle.setAttribute('aria-expanded', 'true');
+                }
+            });
+
+            document.addEventListener('click', function (event)
+            {
+                if (!event.target.closest('.dropdown'))
+                {
+                    dropdownMenu.style.display = 'none';
+                    dropdownMenu.classList.remove('show');
+                    dropdownToggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
+        // On page load
+        ipc.send("getFilesInFolder", {});
 
         // Hide spotify image initially
         spotifyImage.style.visibility = "hidden";
@@ -262,23 +325,10 @@
             document.getElementById("userProfilePhone").innerHTML = tutorData["PhoneNumber"];
         }
 
-        // Recieve user selected folder path
-        ipc.on("getFolderPathReply", function(event, folderFullPath)
+        // For each file gen html and add to area
+        ipc.on("filesList", function(event, files)
         {
-            folderPath.value = folderFullPath;
-            ipc.send("getFilesInFolder", folderFullPath);
-        });
-
-        // Get list of files in folder
-        ipc.on("getFilesInFolderReply", function(event, files)
-        {
-            // Set length
-            fileCount = files.length;
-
-            // Clear text area
             folderFiles.innerHTML = "";
-
-            // Go through list of files and add to text area
             for (let i = 0; i < files.length; i++) 
             {
                 folderFiles.innerHTML +=
@@ -291,48 +341,49 @@
                         <div style="padding-left: 15px;">
                             <img src="" width="65" height="65">
                         </div>
-                        <div class="col-6" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                        <div class="col-9" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
                             Title: </br>
                             Artist: </br>
                             Album: </br>
                         </div>
-                        <div class="col-3">
+                        <div class="col-1" style="display: flex; align-items: center; justify-content: center;">
                             </br>
-                            <a onclick="copySongToTrack(this.parentElement.parentElement)" style="cursor: pointer;">
+                            <a class="grow" onclick="copyDataToSong(this.parentElement.parentElement)">
                                 <i class="mdi mdi-content-copy text-primary"></i>
                             </a>
-                            <a onclick="selectTrack(this.parentElement.parentElement)" style="cursor: pointer;">
-                                <i class="mdi mdi-chevron-double-right text-dark"></i>
+                            <a class="grow" onclick="searchSong(this.parentElement.parentElement)">
+                                <i class="mdi mdi-arrow-right text-dark"></i>
                             </a>
                         </div>
                     </div>
                 </div>`;
             }
-
-            // Get metadata for songs
-            if (files.length > 0)
-            {
-                scanSongs();
-            }
         });
 
-        // Append download output 
+        // Replace previous console download output 
         ipc.on("downloadOutput", function(event, output)
         {
-            downloadLogs.innerHTML += `<p style="font-size: 13px">${output}</p>`;
-            downloadLogs.scrollTop = downloadLogs.scrollHeight;
+            // Remove leading brackets: [download] ...
+            var cleaned = output.trim().replace(/^\[.*?\]\s*/, '');
+
+            // Could be empty
+            if (cleaned == "")
+            {
+                return;
+            }
+            
+            downloadLogs.innerHTML = `<p style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cleaned}</p>`;
         });
 
-        // Recieve download completed
+        // Scan all songs if success
         ipc.on("downloadCompleted", function(event, code)
         {
-            // Stop spinner
             document.getElementById("downloadLogo").classList.remove("mdi-spin");
 
             if (code == 0)
             {
                 successMessage("Download Completed!");
-                ipc.send("getFolderPath", {});
+                ipc.send("getFilesInFolder", {});
             }
             else
             {
@@ -340,17 +391,14 @@
             }
         });
 
-        // Receive song search results
-        ipc.on("songSearchResults", function(event, songResultList)
+        // Gen html for each song and add to area
+        ipc.on("songSearch", function(event, songResultList)
         {
-            // Clear html on each new search
             spotifyResults.innerHTML = "";
             document.getElementById("spotifyLogo").classList.remove("mdi-spin");
 
-            // Go through all tracks in response
             for (let i = 0; i < songResultList.tracks.items.length; i++)
             {
-                // Get individual response song's meta data and push into list data
                 var songMetaData = 
                 {
                     "songName": songResultList.tracks.items[i].name,
@@ -359,7 +407,6 @@
                     "albumImage": songResultList.tracks.items[i].album.images[0].url
                 }
 
-                // Create and add song's html for text box
                 spotifyResults.innerHTML +=
                 `<div class="row mb-3 button-hover" onclick="selectSong(this)" style="cursor: pointer;">
                     <div class="col-2">
@@ -374,10 +421,10 @@
             }
         });
 
-        // Receive song scan result
-        ipc.on("songScanResult", function(event, songResults, index)
+        // Update song data
+        ipc.on("songScan", function(event, songResults, index)
         {
-            // Use only most relevant result
+            // Use only top most result
             var songMetaData =
             {
                 "songName": songResults.tracks.items[0].name,
@@ -403,10 +450,10 @@
             Album: ${songMetaData.albumName}</br>`;
         });
 
-        // Receive songs saved response
-        ipc.on("songsSavedResponse", function(event, successResponse)
+        // Show status message
+        ipc.on("songsSaved", function(event, status)
         {
-            if (successResponse == 0)
+            if (status == 0)
             {
                 successMessage("Files saved!");
             }
@@ -416,7 +463,7 @@
             }
         });
 
-        // Receive song search failure
+        // Display error message
         ipc.on("songSearchFail", function(event, message)
         {
             // Show fail
@@ -425,35 +472,41 @@
             errorMessage(message);
         });
 
-        // Receive song search failure
+        // Display error message
         ipc.on("songScanFail", function(event, message)
         {
             // Show fail
             errorMessage(message);
         });
 
-        // Receive songs delete response
-        ipc.on("deleteAllSongsResponse", function(event, successResponse)
+        // Remove all songs using rm -rf
+        ipc.on("deleteSongs", function(event, status)
         {
-            if (successResponse == 0)
+            if (status != 0)
             {
-                successMessage("All songs deleted.");
-                folderFiles.innerHTML = "";
-            }
-            else            {
                 errorMessage("Couldn't delete songs!");
+                return;   
             }
+
+            successMessage("All songs deleted.");
+            folderFiles.innerHTML = "";
         });
 
-        // Save songs metadata
+        // Save all
         function saveSongs()
         {
+            if (document.getElementById("downloadLogo").classList.contains("mdi-spin"))
+            {
+                errorMessage("Download in progress!");
+                return;
+            }
+
             var fileList = [];
             for (let i = 0; i < folderFiles.children.length; i++)
             {
                 fileList.push(
                 {
-                    "songFullFileName": folderPath.value + "/" + folderFiles.children[i].children[1].getAttribute("data-file-name"),
+                    "songFileName": folderFiles.children[i].children[1].getAttribute("data-file-name"),
                     "albumImage": folderFiles.children[i].children[1].getAttribute("data-song-image"),
                     "songName": folderFiles.children[i].children[1].getAttribute("data-song-title"),
                     "artistName": folderFiles.children[i].children[1].getAttribute("data-song-artist"),
@@ -464,16 +517,21 @@
             if (fileList.length == 0)
             {
                 errorMessage("No files to save!");
+                return;
             }
-            else
-            {
-                ipc.send("saveSongs", fileList);
-            }
+            
+            ipc.send("saveSongs", fileList);
         }
 
-        // Get metadata for songs
+        // Scan all
         function scanSongs()
         {
+            if (document.getElementById("downloadLogo").classList.contains("mdi-spin"))
+            {
+                errorMessage("Download in progress!");
+                return;
+            }
+
             if (folderFiles.children.length == 0)
             {
                 errorMessage("No files to scan!");
@@ -501,26 +559,47 @@
             }
         }
 
-        // Delete songs from folder
+        // Delete all
         function deleteSongs()
         {
-            ipc.send("deleteAllSongs", {});
+            if (document.getElementById("downloadLogo").classList.contains("mdi-spin"))
+            {
+                errorMessage("Download in progress!");
+                return;
+            }
+
+            ipc.send("deleteSongs", {});
         }
 
-        // Open songs folder
+        // Open folder
         function openSongsFolder()
         {
-            if (folderPath.value != "")
-            {
-                ipc.send("openSongsFolder", {});
-            }
-            else
-            {
-                errorMessage("No folder selected!");
-            }
+            ipc.send("openSongsFolder", {});
         }
 
-        // Select song from spotify area
+        // Update icon
+        function settingsToggle(id)
+        {
+            var setting = document.getElementById(id + "Setting");
+
+            // Turn off
+            if (setting.classList.contains("mdi-checkbox-marked-circle"))
+            {
+                setting.style.color = "";
+                setting.classList.remove("mdi-checkbox-marked-circle");
+                setting.classList.add("mdi-checkbox-blank-circle-outline");
+                setting.setAttribute("data-setting", "0");
+                return;
+            }
+
+            // Turn on
+            setting.classList.remove("mdi-checkbox-blank-circle-outline");
+            setting.classList.add("mdi-checkbox-marked-circle");
+            setting.setAttribute("data-setting", "1");
+            setting.style.color = "var(--success)";
+        }
+
+        // Update metadata fields
         function selectSong(songDiv)
         {
             trackMetaData = songDiv.children[1].innerHTML.split("<br>");
@@ -530,8 +609,8 @@
             spotifyAlbum.value = trackMetaData[2].trim().replace("Album: ", "").replace("&amp;", "&");
         }
 
-        // Select track from folder area
-        function selectTrack(songDiv)
+        // Runs when pressing search icon on song file
+        function searchSong(songDiv)
         {
             // Clean song name for spotify search
             var cleanedSongName = songDiv.getAttribute("data-file-name").replace(".mp3", "")
@@ -553,8 +632,8 @@
             searchSpotify();
         }
 
-        // Copy song metadata to track
-        function copySongToTrack(songDiv)
+        // Runs when pressing copy icon on song file
+        function copyDataToSong(songDiv)
         {
             songDiv.setAttribute("data-song-image", spotifyImage.src);
             songDiv.setAttribute("data-song-title", spotifyTitle.value);
@@ -568,56 +647,20 @@
             Album: ${spotifyAlbum.value}</br>`;
         }
 
-        // Function to run when profile settings item is clicked
-        function profileMenuNav(buttonToMakeActive, elementsToMakeVisible, functionToRun)
-        {
-            // Get admin body area
-            var profileBodyArea = document.getElementById("profileBodyArea");
-            document.getElementById(currentProfileButton).className = "nav-link";
-            document.getElementById(buttonToMakeActive).className = "nav-link active";
-            currentProfileButton = buttonToMakeActive;
-
-            // Go through children
-            for (let i = 0; i < profileBodyArea.children.length; i++)
-            {
-                if (elementsToMakeVisible.includes(i))
-                {
-                    profileBodyArea.children[i].style.display = "block";
-                }
-                else
-                {
-                    profileBodyArea.children[i].style.display = "none";
-                }
-            }
-
-            // Run function
-            setTimeout(function() {window[functionToRun]();}, asyncFunctionTimeout);
-        }
-
-        // Function to run when menu item is clicked
-        function menuNav(dashboardName, functionToRun)
-        {
-            // Hide old dashboard show new and adjust current dashboard var accordingly
-            document.getElementById(currentDashboard).style.display = "none";
-            document.getElementById(dashboardName).style.display = "block";
-            currentDashboard = dashboardName;
-
-            // Run function
-            setTimeout(function() {window[functionToRun]();}, asyncFunctionTimeout);
-        }
-    
-        // Function listener for enter on download link
+        // Enter on download link
         downloadLink.addEventListener("keypress", function(event)
         {
             if (event.key == "Enter") 
             {
-                downloadLogs.innerHTML = "";
                 document.getElementById("downloadLogo").classList.add("mdi-spin");
-                ipc.send("downloadFromLink", downloadLink.value);
+                ipc.send("downloadFromLink", downloadLink.value,
+                document.getElementById("audioOnlySetting").getAttribute("data-setting"),
+                document.getElementById("noWarningsSetting").getAttribute("data-setting"),
+                document.getElementById("ignoreErrorsSetting").getAttribute("data-setting"));
             }
         });
 
-        // Function listerner for enter on spotify search
+        // Enter on spotify search
         spotifySearch.addEventListener("keypress", function(event)
         {
             if (event.key == "Enter")
@@ -632,9 +675,11 @@
             spotifyImage.style.visibility = "visible";
         });
 
-        // Search spotify
+        // Send request
         function searchSpotify()
         {
+            // Show loading elements
+            document.getElementById("spotifyLogo").classList.add("mdi-spin");
             spotifyResults.innerHTML = "";
             spotifyResults.innerHTML +=
             `<div class="row mb-3">
@@ -648,7 +693,6 @@
                 </div>
             </div>`;
 
-            document.getElementById("spotifyLogo").classList.add("mdi-spin");
             ipc.send("searchSong", spotifySearch.value);
         }
     </script>
