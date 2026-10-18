@@ -91,5 +91,8 @@ typings/
 # Electron-Forge
 out/
 
+# Old electron-builder output
+dist/
+
 # Downloads
 downloads/

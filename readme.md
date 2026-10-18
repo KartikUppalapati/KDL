@@ -10,6 +10,8 @@ SPOTIFY_CLIENT_SECRET="secret_here"
 
 ## Installation & Running
 
+Requires Node.js 22.13 or newer (for Electron Forge 8).
+
 Run the following commands to install dependencies and start the application:
 
 ```bash

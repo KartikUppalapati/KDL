@@ -6,16 +6,14 @@
         <!-- <meta http-equiv="X-UA-Compatible" content="IE=edge"/> -->
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
-        <!-- GOOGLE FONTS -->
+        <!-- ICONS -->
         <link type="text/css" href="plugins/material/css/materialdesignicons.min.css" rel="stylesheet"/>
-        <link type="text/css" href="plugins/simplebar/simplebar.css" rel="stylesheet"/>
 
         <!-- MONO CSS -->
         <link type="text/css" href="index.css" id="main-css-href" rel="stylesheet"/>
 
         <!-- FAVICON -->
         <!-- <link href="images/favicon.png" rel="shortcut icon"/> -->
-        <script src="plugins/nprogress/nprogress.js"></script>
     </head>
 
     <body class="navbar-fixed" id="body">
@@ -51,6 +49,7 @@
                     <div class="content">
                         <div id="homeArea">
                             <div class="row">
+                                <!-- Left Side -->
                                 <div class="col-7">
                                     <!-- Download Area -->
                                     <div class="card card-default">
@@ -127,7 +126,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Spotify Area -->
+                                <!-- Right Side -->
                                 <div class="col-5">
                                     <div class="card card-default">
                                         <div class="card-body mt-1">
@@ -223,6 +222,107 @@
         var dropdownToggle = document.querySelector('.dropdown-toggle');
         var dropdownMenu = document.querySelector('.dropdown-menu');
 
+        // Escape text before putting it in html
+        function escapeHtml(text)
+        {
+            return String(text ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[c]);
+        }
+
+        // Words that mark a different version of a song, kept in searches so e.g. a remix finds the remix
+        var versionWords = "remix|live|acoustic|unplugged|sped up|slowed|reverb|nightcore|instrumental|karaoke|cover|demo|radio edit|extended|version|edit|mix";
+
+        // Which version words a name has, e.g. "remix" or "karaoke version", "" for none
+        function getVersion(text)
+        {
+            var found = (text.match(new RegExp(`\\b(${versionWords})\\b`, "gi")) || []).map(word => word.toLowerCase());
+            return [...new Set(found)].sort().join(" ");
+        }
+
+        // Words that only describe the upload (official video, lyrics, HD...)
+        var junkWords = "official|music|lyrics?|visuali[sz]er|audio|video|clip|hd|hq|4k|explicit|remaster(ed)?";
+
+        // Clean song file name for spotify search
+        function cleanSongName(fileName)
+        {
+            // Drop extension, undo yt-dlp's full width characters (｜ ＂ ？) and make quotes, dashes and brackets plain.
+            // 「」 『』 are quotes around a Japanese song title, so they're dropped but their text is kept
+            var cleanedSongName = fileName.replace(/\.[^.]+$/, "").normalize("NFKC")
+                .replace(/⧸/g, "/")
+                .replace(/[\[{【〔]/g, "(").replace(/[\]}】〕]/g, ")")
+                .replace(/[“”„«»"「」『』]/g, " ").replace(/[‘’]/g, "'")
+                .replace(/\s[–—]\s/g, " - ");
+
+            // Anything after " | " or " // " is a description, not the song
+            cleanedSongName = cleanedSongName.replace(/\s(\||\/\/)\s.*$/, "");
+
+            // Replace (...) groups innermost first, keeping only version words from them
+            var previous;
+            do
+            {
+                previous = cleanedSongName;
+                cleanedSongName = cleanedSongName.replace(/\(([^()]*)\)/g, (group, inside) =>
+                    " " + (inside.match(new RegExp(`\\b(${versionWords})\\b`, "gi")) || []).join(" ") + " ");
+            }
+            while (cleanedSongName != previous);
+            cleanedSongName = cleanedSongName.replace(/[()]/g, " ");
+
+            // Featured artists outside brackets, up to the next " - " or the end
+            cleanedSongName = cleanedSongName.replace(/\s(ft\.?|feat\.?|featuring)\s.*?(?=\s-\s|$)/i, " ");
+
+            // Junk words at the end ("... OFFICIAL VIDEO"). A single word only if it can't be the song's name ("Music", "Video Games")
+            var trailingJunk = cleanedSongName.match(new RegExp(`(\\s-)?(\\s+(${junkWords}))+\\s*$`, "i"));
+            if (trailingJunk && (trailingJunk[0].trim().split(/\s+/).filter(word => word != "-").length > 1 || /^(official|lyrics?|hd|hq|4k)$/i.test(trailingJunk[0].trim())))
+            {
+                cleanedSongName = cleanedSongName.slice(0, trailingJunk.index);
+            }
+
+            // Collab separators (lowercase x only, so "Lil Nas X" stays), artist - title dash, emojis
+            return cleanedSongName
+                .replace(/\sx\s/g, " ").replace(/\s(&|vs\.?)\s/gi, " ").replace(/,\s/g, " ")
+                .replace(/\s-(\s|$)/g, " ")
+                .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+                .replace(/\s+/g, " ").trim();
+        }
+
+        // Split text into plain lowercase words (no accents or punctuation) for comparing names
+        function toWords(text)
+        {
+            return text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
+                .replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean);
+        }
+
+        // Pick the result whose title and artist best match the search and whose version (remix, live...) agrees with it.
+        // Ties go to Spotify's order. Names with no latin words (e.g. Japanese) just score by order.
+        // Returns { track, confident }, confident only when the whole title, an artist and the version all match
+        function pickBestTrack(search, tracks)
+        {
+            var searchWords = new Set(toWords(search));
+            var wantedVersion = getVersion(search);
+            var best = { track: null, confident: false };
+            var bestScore = -Infinity;
+
+            tracks.forEach((track, rank) =>
+            {
+                // Title without "(feat. ...)" or "- Remix" parts, those are checked separately
+                var titleWords = toWords(track.name.replace(/\(.*?\)|\[.*?\]|\s-\s.*$/g, ""));
+                var titleMatch = titleWords.filter(word => searchWords.has(word)).length / Math.max(titleWords.length, 1);
+                var artistMatch = track.artists.some(artist => toWords(artist.name).some(word => searchWords.has(word))) ? 1 : 0;
+                var versionMismatch = getVersion(track.name) != wantedVersion ? 1 : 0;
+
+                var score = titleMatch * 2 + artistMatch - versionMismatch - rank * 0.05;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+
+                    // No title words means it couldn't be checked (e.g. a Japanese title), so not confident either
+                    var confident = titleWords.length > 0 && titleMatch == 1 && artistMatch == 1 && versionMismatch == 0;
+                    best = { track, confident };
+                }
+            });
+
+            return best;
+        }
+
         // Settings dropdown menu logic
         if (dropdownToggle && dropdownMenu)
         {
@@ -316,49 +416,93 @@
             }, 1500);
         };
 
-        // Update profile header
-        function updateProfileHeader()
+        // Add a file to the end of the list, unless it's already there. Returns whether it was added.
+        // insertAdjacentHTML leaves the other rows (and their scanned metadata) untouched
+        function addFileRow(fileName)
         {
-            // Set profile header
-            document.getElementById("userProfileName").innerHTML = tutorData["FirstName"] + " " + tutorData["LastName"];
-            document.getElementById("userProfileEmail").innerHTML = tutorData["Email"];
-            document.getElementById("userProfilePhone").innerHTML = tutorData["PhoneNumber"];
+            for (let i = 0; i < folderFiles.children.length; i++)
+            {
+                if (folderFiles.children[i].children[1].getAttribute("data-file-name") == fileName)
+                {
+                    return false;
+                }
+            }
+
+            // Clicking anywhere on a song searches spotify for it, the copy button stops its click from also doing that
+            folderFiles.insertAdjacentHTML("beforeend",
+            `<div class="mb-3 button-hover" onclick="searchSong(this.children[1])" style="cursor: pointer; position: relative; padding-right: 40px;">
+                <div style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                    <i class="save-status mdi" style="display: none;"></i>
+                    <i class="match-unsure mdi mdi-help-circle" style="display: none; color: var(--warning);"
+                    title="Unsure match, click the song to check it"></i>
+                    ${escapeHtml(fileName)}
+                </div>
+                <div class="row" data-file-name="${escapeHtml(fileName)}"
+                data-song-image="" data-song-title="" data-song-artist="" data-song-album="">
+                    <div style="padding-left: 15px;">
+                        <img src="" width="65" height="65">
+                    </div>
+                    <div class="col" style="min-width: 0; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                        Title: </br>
+                        Artist: </br>
+                        Album: </br>
+                    </div>
+                </div>
+
+                <!-- Copy button: far right, centered on the whole song (the padding-right above keeps text out from under it) -->
+                <div style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
+                    <a class="grow" onclick="event.stopPropagation(); copyDataToSong(this.parentElement.parentElement.children[1])">
+                        <i class="mdi mdi-content-copy text-primary" style="font-size: 20px;"></i>
+                    </a>
+                </div>
+            </div>`);
+            return true;
         }
 
-        // For each file gen html and add to area
+        // Add any files not shown yet (all of them on page load)
         ipc.on("filesList", function(event, files)
         {
-            folderFiles.innerHTML = "";
-            for (let i = 0; i < files.length; i++) 
+            files.forEach(addFileRow);
+        });
+
+        // Show the folder list's scrollbar only while scrolling, hidden again a second after it stops (see index.css)
+        var scrollbarTimeout = null;
+        folderFiles.addEventListener("scroll", function()
+        {
+            folderFiles.classList.add("scrolling");
+            clearTimeout(scrollbarTimeout);
+            scrollbarTimeout = setTimeout(() => folderFiles.classList.remove("scrolling"), 1000);
+        });
+
+        // Show each song as soon as yt-dlp finishes it, and scan it right away.
+        // A song that was already in the list (downloaded again) keeps its metadata
+        ipc.on("songDownloaded", function(event, fileName)
+        {
+            // Checked before adding, since the new row makes the list longer.
+            // A few px of slack for rounding, and the scroll is instant so a second song never lands mid animation
+            var wasAtBottom = folderFiles.scrollHeight - folderFiles.scrollTop - folderFiles.clientHeight <= 5;
+
+            if (addFileRow(fileName))
             {
-                folderFiles.innerHTML +=
-                `<div id="song${i}" class="mb-3">
-                    <div style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
-                        ${files[i]}
-                    </div>
-                    <div class="row" data-file-name="${files[i]}"
-                    data-song-image="" data-song-title="" data-song-artist="" data-song-album="">
-                        <div style="padding-left: 15px;">
-                            <img src="" width="65" height="65">
-                        </div>
-                        <div class="col-9" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
-                            Title: </br>
-                            Artist: </br>
-                            Album: </br>
-                        </div>
-                        <div class="col-1" style="display: flex; align-items: center; justify-content: center;">
-                            </br>
-                            <a class="grow" onclick="copyDataToSong(this.parentElement.parentElement)">
-                                <i class="mdi mdi-content-copy text-primary"></i>
-                            </a>
-                            <a class="grow" onclick="searchSong(this.parentElement.parentElement)">
-                                <i class="mdi mdi-arrow-right text-dark"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>`;
+                scanSong(folderFiles.children.length - 1);
+
+                // Follow along at the bottom, stay put if scrolled up (e.g. fixing a song mid download)
+                if (wasAtBottom)
+                {
+                    folderFiles.scrollTop = folderFiles.scrollHeight;
+                }
             }
         });
+
+        // Replace the download log's line, optionally colored (e.g. var(--success) or var(--danger))
+        function setDownloadLog(text, color = "")
+        {
+            downloadLogs.innerHTML = `<p style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(text)}</p>`;
+            downloadLogs.firstChild.style.color = color;
+        }
+
+        // Last error yt-dlp printed, shown with "Download Failed!" since that message replaces it in the log
+        var lastDownloadError = "";
 
         // Replace previous console download output 
         ipc.on("downloadOutput", function(event, output)
@@ -371,24 +515,32 @@
             {
                 return;
             }
-            
-            downloadLogs.innerHTML = `<p style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cleaned}</p>`;
+
+            // Error output can come with other lines in the same chunk
+            var errorLine = cleaned.split(/\r?\n/).reverse().find(line => line.trim().startsWith("ERROR:"));
+            if (errorLine)
+            {
+                lastDownloadError = errorLine.trim().replace(/^ERROR:\s*(\[.*?\]\s*)?/, "");
+            }
+            setDownloadLog(cleaned);
         });
 
-        // Scan all songs if success
+        // Songs were added as they finished, this just catches any that were missed (even when some videos failed)
         ipc.on("downloadCompleted", function(event, code)
         {
             document.getElementById("downloadLogo").classList.remove("mdi-spin");
+            ipc.send("getFilesInFolder", {});
 
+            // Shown in the download log (not the top message), in the same colors as successMessage/errorMessage
             if (code == 0)
             {
-                successMessage("Download Completed!");
-                ipc.send("getFilesInFolder", {});
+                setDownloadLog("Download Completed!", "var(--success)");
             }
             else
             {
-                errorMessage("Download Failed!");
+                setDownloadLog("Download Failed!" + (lastDownloadError ? " " + lastDownloadError : ""), "var(--danger)");
             }
+            lastDownloadError = "";
         });
 
         // Gen html for each song and add to area
@@ -404,18 +556,20 @@
                     "songName": songResultList.tracks.items[i].name,
                     "albumName": songResultList.tracks.items[i].album.name,
                     "artistName": songResultList.tracks.items[i].artists[0].name,
-                    "albumImage": songResultList.tracks.items[i].album.images[0].url
+                    "albumImage": songResultList.tracks.items[i].album.images[0]?.url || ""
                 }
 
                 spotifyResults.innerHTML +=
-                `<div class="row mb-3 button-hover" onclick="selectSong(this)" style="cursor: pointer;">
+                `<div class="row mb-3 button-hover" onclick="selectSong(this)" style="cursor: pointer;"
+                data-song-image="${escapeHtml(songMetaData.albumImage)}" data-song-title="${escapeHtml(songMetaData.songName)}"
+                data-song-artist="${escapeHtml(songMetaData.artistName)}" data-song-album="${escapeHtml(songMetaData.albumName)}">
                     <div class="col-2">
-                        <img src="${songMetaData.albumImage}" width="65" height="65">
+                        <img src="${escapeHtml(songMetaData.albumImage)}" width="65" height="65">
                     </div>
-                    <div class="col-10" style="white-space: nowrap;">
-                        Title: ${songMetaData.songName}</br>
-                        Artist: ${songMetaData.artistName}</br>
-                        Album: ${songMetaData.albumName}</br>
+                    <div class="col-10" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
+                        Title: ${escapeHtml(songMetaData.songName)}</br>
+                        Artist: ${escapeHtml(songMetaData.artistName)}</br>
+                        Album: ${escapeHtml(songMetaData.albumName)}</br>
                     </div>
                 </div>`;
             }
@@ -424,42 +578,104 @@
         // Update song data
         ipc.on("songScan", function(event, songResults, index)
         {
-            // Use only top most result
+            // Get song div, list may have changed since the scan started
+            var child = folderFiles.children[index];
+            if (!child)
+            {
+                return;
+            }
+            var songDiv = child.children[1];
+
+            // Use the result that best matches the file name
+            var { track, confident } = pickBestTrack(cleanSongName(songDiv.getAttribute("data-file-name")), songResults.tracks?.items || []);
+            if (!track)
+            {
+                errorMessage("No match for " + songDiv.getAttribute("data-file-name"));
+                return;
+            }
             var songMetaData =
             {
-                "songName": songResults.tracks.items[0].name,
-                "albumName": songResults.tracks.items[0].album.name,
-                "artistName": songResults.tracks.items[0].artists[0].name,
-                "albumImage": songResults.tracks.items[0].album.images[0].url
+                "songName": track.name,
+                "albumName": track.album.name,
+                "artistName": track.artists[0].name,
+                "albumImage": track.album.images[0]?.url || ""
             }
-
-            // Get song div
-            child = folderFiles.children[index];
-            var songDiv = child.children[1];
 
             // Set song metadata fields
             songDiv.setAttribute("data-song-image", songMetaData.albumImage);
             songDiv.setAttribute("data-song-title", songMetaData.songName);
             songDiv.setAttribute("data-song-artist", songMetaData.artistName);
             songDiv.setAttribute("data-song-album", songMetaData.albumName);
+            setSaveStatus(songDiv, "unsaved");
+            setMatchUnsure(songDiv, !confident);
 
             songDiv.children[0].getElementsByTagName("img")[0].src = songMetaData.albumImage;
             songDiv.children[1].innerHTML =
-            `Title: ${songMetaData.songName}</br>
-            Artist: ${songMetaData.artistName}</br>
-            Album: ${songMetaData.albumName}</br>`;
+            `Title: ${escapeHtml(songMetaData.songName)}</br>
+            Artist: ${escapeHtml(songMetaData.artistName)}</br>
+            Album: ${escapeHtml(songMetaData.albumName)}</br>`;
         });
 
         // Show status message
-        ipc.on("songsSaved", function(event, status)
+        // Show or hide the question mark for a scan result that may be the wrong song
+        function setMatchUnsure(songDiv, unsure)
         {
-            if (status == 0)
+            songDiv.parentElement.querySelector(".match-unsure").style.display = unsure ? "" : "none";
+        }
+
+        // Show a saved/failed icon next to a file name, any other status hides it
+        function setSaveStatus(songDiv, status)
+        {
+            var icon = songDiv.parentElement.querySelector(".save-status");
+            icon.className = "save-status mdi";
+            icon.style.display = "none";
+
+            if (status == "saved")
             {
-                successMessage("Files saved!");
+                icon.classList.add("mdi-check-circle");
+                icon.style.color = "var(--success)";
+                icon.title = "Saved";
+                icon.style.display = "";
+            }
+            else if (status == "failed")
+            {
+                icon.classList.add("mdi-alert-circle");
+                icon.style.color = "var(--danger)";
+                icon.title = "Not saved";
+                icon.style.display = "";
+            }
+        }
+
+        // Update one file's icon as it finishes saving
+        ipc.on("songSaved", function(event, fileName, status)
+        {
+            for (let i = 0; i < folderFiles.children.length; i++)
+            {
+                var songDiv = folderFiles.children[i].children[1];
+                if (songDiv.getAttribute("data-file-name") == fileName)
+                {
+                    setSaveStatus(songDiv, status);
+                    return;
+                }
+            }
+        });
+
+        ipc.on("songsSaved", function(event, result)
+        {
+            var files = (count) => count + (count == 1 ? " file" : " files");
+            var skippedText = result.skipped > 0 ? ` (${result.skipped} skipped)` : "";
+
+            if (result.failed > 0)
+            {
+                errorMessage(`${files(result.failed)} not saved, ${result.saved} saved.${skippedText}`);
+            }
+            else if (result.saved == 0)
+            {
+                errorMessage("No data to save!");
             }
             else
             {
-                errorMessage("Files not saved!");
+                successMessage(`${files(result.saved)} saved!${skippedText}`);
             }
         });
 
@@ -524,14 +740,9 @@
         }
 
         // Scan all
+        // Allowed during a download: finished songs are already in the list, and new rows only go at the end
         function scanSongs()
         {
-            if (document.getElementById("downloadLogo").classList.contains("mdi-spin"))
-            {
-                errorMessage("Download in progress!");
-                return;
-            }
-
             if (folderFiles.children.length == 0)
             {
                 errorMessage("No files to scan!");
@@ -540,23 +751,15 @@
 
             for (let i = 0; i < folderFiles.children.length; i++)
             {
-                // Get song div
-                child = folderFiles.children[i];
-                var songDiv = child.children[1];
-
-                // Clean song name for spotify search
-                var cleanedSongName = songDiv.getAttribute("data-file-name").replace(".mp3", "")
-                cleanedSongName = cleanedSongName.replace('{', '(');
-                cleanedSongName = cleanedSongName.replace('}', '(');
-                cleanedSongName = cleanedSongName.replace('[', '(');
-                cleanedSongName = cleanedSongName.replace(']', ')');
-                while (cleanedSongName.includes("(")) 
-                {
-                    cleanedSongName = cleanedSongName.replace(/ *\([^)]*\) */g, "");
-                }
-
-                ipc.send("scanSong", cleanedSongName, i);
+                scanSong(i);
             }
+        }
+
+        // Look up one song in the list on spotify, the result comes back in songScan
+        function scanSong(index)
+        {
+            var songDiv = folderFiles.children[index].children[1];
+            ipc.send("scanSong", cleanSongName(songDiv.getAttribute("data-file-name")), index);
         }
 
         // Delete all
@@ -602,26 +805,17 @@
         // Update metadata fields
         function selectSong(songDiv)
         {
-            trackMetaData = songDiv.children[1].innerHTML.split("<br>");
-            spotifyImage.src = songDiv.children[0].getElementsByTagName("img")[0].src;
-            spotifyTitle.value = trackMetaData[0].trim().replace("Title: ", "").replace("&amp;", "&");
-            spotifyArtist.value = trackMetaData[1].trim().replace("Artist: ", "").replace("&amp;", "&");
-            spotifyAlbum.value = trackMetaData[2].trim().replace("Album: ", "").replace("&amp;", "&");
+            spotifyImage.src = songDiv.getAttribute("data-song-image");
+            spotifyTitle.value = songDiv.getAttribute("data-song-title");
+            spotifyArtist.value = songDiv.getAttribute("data-song-artist");
+            spotifyAlbum.value = songDiv.getAttribute("data-song-album");
         }
 
         // Runs when pressing search icon on song file
         function searchSong(songDiv)
         {
             // Clean song name for spotify search
-            var cleanedSongName = songDiv.getAttribute("data-file-name").replace(".mp3", "")
-            cleanedSongName = cleanedSongName.replace('{', '(');
-            cleanedSongName = cleanedSongName.replace('}', '(');
-            cleanedSongName = cleanedSongName.replace('[', '(');
-            cleanedSongName = cleanedSongName.replace(']', ')');
-            while (cleanedSongName.includes("(")) 
-            {
-                cleanedSongName = cleanedSongName.replace(/ *\([^)]*\) */g, "");
-            }
+            var cleanedSongName = cleanSongName(songDiv.getAttribute("data-file-name"));
 
             // Set song metadata fields
             spotifyImage.src = songDiv.getAttribute("data-song-image")
@@ -639,12 +833,16 @@
             songDiv.setAttribute("data-song-title", spotifyTitle.value);
             songDiv.setAttribute("data-song-artist", spotifyArtist.value);
             songDiv.setAttribute("data-song-album", spotifyAlbum.value);
+            setSaveStatus(songDiv, "unsaved");
+
+            // Picked by hand, so no longer a guess
+            setMatchUnsure(songDiv, false);
 
             songDiv.children[0].getElementsByTagName("img")[0].src = spotifyImage.src;
             songDiv.children[1].innerHTML =
-            `Title: ${spotifyTitle.value}</br>
-            Artist: ${spotifyArtist.value}</br>
-            Album: ${spotifyAlbum.value}</br>`;
+            `Title: ${escapeHtml(spotifyTitle.value)}</br>
+            Artist: ${escapeHtml(spotifyArtist.value)}</br>
+            Album: ${escapeHtml(spotifyAlbum.value)}</br>`;
         }
 
         // Enter on download link
@@ -686,7 +884,7 @@
                 <div class="col-2">
                     <img src="" width="65" height="65">
                 </div>
-                <div class="col-10" style="white-space: nowrap;">
+                <div class="col-10" style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
                     Title: </br>
                     Artist: </br>
                     Album: </br>

@@ -17539,8 +17539,41 @@ li a:hover p
     color: var(--primary);
 }
 
+/* Inline-block because transforms don't apply to inline elements like <a> */
+.grow
+{
+    display: inline-block;
+    transition: transform 0.15s;
+}
+
 .grow:hover
 {
     cursor: pointer;
-    transform: scale(1.5);
+    transform: scale(1.25);
+}
+
+/* Folder list scrollbar only shows while scrolling (index.html adds .scrolling) */
+#folderFiles::-webkit-scrollbar
+{
+    width: 6px;
+}
+
+#folderFiles::-webkit-scrollbar-track,
+#folderFiles::-webkit-scrollbar-thumb
+{
+    background: transparent;
+    border-radius: 30px;
+}
+
+#folderFiles.scrolling::-webkit-scrollbar-thumb
+{
+    background: rgba(153, 153, 153, 0.4);
+}
+
+/* Bootstrap rows have -15px side margins, the right one sticks out of these lists and makes them scroll sideways.
+   The left one stays, it lines the covers up with the text above them */
+#folderFiles .row,
+#spotifyResults .row
+{
+    margin-right: 0;
 }

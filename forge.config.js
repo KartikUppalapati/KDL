@@ -1,8 +1,7 @@
 module.exports = {
   packagerConfig: {
-    asar: {
-      unpack: "**/node_modules/ytdlp-nodejs/bin/**"
-    },
+    appBundleId: 'com.karts.kdl',
+    asar: true,
     extraResource: [
       './src/dependencies',
     ],

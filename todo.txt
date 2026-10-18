@@ -1,0 +1,1 @@
+- If Electron is upgraded (its built-in Node gets newer), check that extract-zip still unzips yt-dlp/deno: extract-zip 2.0.1 stalls on Node 26 (fine on Electron 27's Node 18). @electron-internal/extract-zip is the fixed fork (needs Node 22.12+)
