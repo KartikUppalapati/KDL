@@ -1202,3 +1202,252 @@ ipc.on("downloadFromLink", async function(event, link, settings)
         fs.rmSync(archivePath, { force: true });
     }
 });
+
+
+// App updates, from the GitHub releases (npm run publish uploads them).
+// The mac app isn't signed, which Electron's autoUpdater needs there, so KDL replaces its own .app instead:
+// the new zip is downloaded and unzipped in the background, then swapped in after KDL quits (relaunching it if
+// "Restart to update" was clicked). Windows uses Squirrel's autoUpdater, which doesn't need signing.
+// Linux packages need sudo to replace, so there the page just links to the release
+const updateRepo = "KartikUppalapati/KDL";
+const updateDir = path.join(app.getPath("userData"), "update");
+
+// { status: "ready" | "available", version, url }, kept so a reopened window still shows it
+var appUpdate = null;
+var appUpdateCheck = null;
+const appUpdatePages = new Set();
+var lastAppUpdateCheck = 0;
+
+// The new .app waiting to be swapped in, and whether KDL should reopen after
+var pendingMacUpdate = null;
+var relaunchAfterUpdate = false;
+
+// "v1.2.3" -> [1, 2, 3], to compare release tags with app.getVersion()
+function isNewerVersion(version, current)
+{
+    const parse = (v) => v.replace(/^v/, "").split(/[.-]/).map(n => parseInt(n) || 0);
+    const a = parse(version), b = parse(current);
+    for (var i = 0; i < Math.max(a.length, b.length); i++)
+    {
+        if ((a[i] || 0) != (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+    }
+    return false;
+}
+
+// The running KDL.app, or why it can't be replaced. Run from Downloads, macOS runs a read-only copy of it
+// (App Translocation), and an app in a folder the user can't write to can't be replaced either
+function getMacAppPath()
+{
+    const appPath = path.resolve(app.getPath("exe"), "../../..");
+    if (!appPath.endsWith(".app"))
+    {
+        return { error: "KDL isn't running from an app" };
+    }
+    if (appPath.includes("/AppTranslocation/"))
+    {
+        return { error: "Move KDL to Applications to get updates" };
+    }
+    try
+    {
+        fs.accessSync(path.dirname(appPath), fs.constants.W_OK);
+        fs.accessSync(appPath, fs.constants.W_OK);
+    }
+    catch (error)
+    {
+        return { error: `KDL can't replace itself in ${path.dirname(appPath)}` };
+    }
+    return { appPath };
+}
+
+// Download and unzip the new mac app into updateDir/<version>. A finished one from before is reused
+async function downloadMacUpdate(release, version)
+{
+    const asset = release.assets.find(a => new RegExp(`-darwin-${process.arch}-.*\\.zip$`).test(a.name));
+    const expectedHash = asset?.digest?.startsWith("sha256:") ? asset.digest.slice(7) : undefined;
+    if (!asset || !expectedHash)
+    {
+        throw new Error(`No ${process.arch} mac zip with a checksum in release ${release.tag_name}`);
+    }
+
+    // Older downloads are no use anymore
+    const versionDir = path.join(updateDir, version);
+    fs.mkdirSync(updateDir, { recursive: true });
+    for (const file of fs.readdirSync(updateDir))
+    {
+        if (file !== version) fs.rmSync(path.join(updateDir, file), { recursive: true, force: true });
+    }
+
+    const findApp = () => fs.existsSync(versionDir) && fs.readdirSync(versionDir).find(file => file.endsWith(".app"));
+    if (!findApp())
+    {
+        const zipPath = versionDir + ".zip";
+        const hash = await downloadFile(asset.browser_download_url, zipPath, `KDL ${version}`, () => {});
+        if (hash !== expectedHash.toLowerCase())
+        {
+            fs.rmSync(zipPath, { force: true });
+            throw new Error(`Checksum mismatch for ${asset.name}`);
+        }
+
+        // ditto keeps the symlinks and permissions inside the app's frameworks
+        const tempDir = versionDir + ".download";
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        await new Promise((resolve, reject) =>
+        {
+            const child = spawn("ditto", ["-x", "-k", zipPath, tempDir]);
+            child.on("error", reject);
+            child.on("close", (code) => code === 0 ? resolve() : reject(new Error(`Couldn't unzip ${asset.name}`)));
+        });
+        fs.rmSync(zipPath, { force: true });
+        fs.rmSync(versionDir, { recursive: true, force: true });
+        fs.renameSync(tempDir, versionDir);
+    }
+
+    const newApp = findApp();
+    if (!newApp)
+    {
+        throw new Error(`No app in ${asset.name}`);
+    }
+    return path.join(versionDir, newApp);
+}
+
+// Squirrel downloads the update itself and installs it when KDL quits
+function checkWindowsUpdate()
+{
+    return new Promise((resolve, reject) =>
+    {
+        const { autoUpdater } = require("electron");
+        const cleanup = () =>
+        {
+            autoUpdater.removeListener("update-downloaded", onDownloaded);
+            autoUpdater.removeListener("update-not-available", onNotAvailable);
+            autoUpdater.removeListener("error", onError);
+        };
+        const onDownloaded = () => { cleanup(); resolve(true); };
+        const onNotAvailable = () => { cleanup(); resolve(false); };
+        const onError = (error) => { cleanup(); reject(error); };
+        autoUpdater.on("update-downloaded", onDownloaded);
+        autoUpdater.on("update-not-available", onNotAvailable);
+        autoUpdater.on("error", onError);
+
+        // Squirrel reads RELEASES and the .nupkg next to it, github redirects latest/download/<file> to the newest release
+        autoUpdater.setFeedURL({ url: `https://github.com/${updateRepo}/releases/latest/download` });
+        autoUpdater.checkForUpdates();
+    });
+}
+
+// Check for a newer release and get it ready. Failing is fine, it's checked again the next day
+function checkForAppUpdate()
+{
+    if (appUpdate || appUpdateCheck || !app.isPackaged || process.argv.includes("--squirrel-firstrun"))
+    {
+        return;
+    }
+    lastAppUpdateCheck = Date.now();
+    appUpdateCheck = (async () =>
+    {
+        const res = await fetch(`https://api.github.com/repos/${updateRepo}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
+        if (!res.ok)
+        {
+            throw new Error(`${res.status} ${res.statusText}`);
+        }
+        const release = await res.json();
+        const version = release.tag_name.replace(/^v/, "");
+        if (!isNewerVersion(version, app.getVersion()))
+        {
+            return;
+        }
+
+        if (platform === "darwin")
+        {
+            const { appPath, error } = getMacAppPath();
+            if (error)
+            {
+                appUpdate = { status: "available", version, url: release.html_url, reason: error };
+                return;
+            }
+            pendingMacUpdate = { appPath, newAppPath: await downloadMacUpdate(release, version) };
+            appUpdate = { status: "ready", version };
+        }
+        else if (platform === "win32")
+        {
+            if (await checkWindowsUpdate())
+            {
+                appUpdate = { status: "ready", version };
+            }
+        }
+        else
+        {
+            appUpdate = { status: "available", version, url: release.html_url };
+        }
+    })()
+    .catch((error) => console.error(`Couldn't check for a KDL update: ${error.message}`))
+    .finally(() =>
+    {
+        appUpdateCheck = null;
+        if (appUpdate)
+        {
+            appUpdatePages.forEach(contents => contents.send("appUpdate", appUpdate));
+        }
+    });
+}
+
+// Check a few seconds after the page loads (so it doesn't slow down starting), then once a day
+app.on("web-contents-created", function(event, contents)
+{
+    contents.on("destroyed", () => appUpdatePages.delete(contents));
+    contents.on("did-finish-load", function()
+    {
+        appUpdatePages.add(contents);
+        if (appUpdate)
+        {
+            contents.send("appUpdate", appUpdate);
+        }
+        else
+        {
+            setTimeout(checkForAppUpdate, 5000);
+        }
+    });
+});
+setInterval(function()
+{
+    if (Date.now() - lastAppUpdateCheck > updateCheckInterval)
+    {
+        checkForAppUpdate();
+    }
+}, 60 * 60 * 1000);
+
+// "Restart to update" in the page
+ipc.on("installAppUpdate", function()
+{
+    if (appUpdate?.status !== "ready")
+    {
+        return;
+    }
+    if (platform === "win32")
+    {
+        require("electron").autoUpdater.quitAndInstall();
+        return;
+    }
+    relaunchAfterUpdate = true;
+    app.quit();
+});
+
+// Swap the new .app in once KDL has exited. If moving the new one in fails, the old one is put back
+app.on("will-quit", function()
+{
+    if (!pendingMacUpdate)
+    {
+        return;
+    }
+    const script = `
+        while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
+        rm -rf "$2.old"
+        if mv "$2" "$2.old"; then
+            if mv "$3" "$2"; then rm -rf "$2.old" "$(dirname "$3")"; else mv "$2.old" "$2"; fi
+        fi
+        if [ "$4" = 1 ]; then open "$2"; fi`;
+    const { appPath, newAppPath } = pendingMacUpdate;
+    pendingMacUpdate = null;
+    spawn("/bin/sh", ["-c", script, "sh", String(process.pid), appPath, newAppPath, relaunchAfterUpdate ? "1" : "0"],
+          { detached: true, stdio: "ignore" }).unref();
+});

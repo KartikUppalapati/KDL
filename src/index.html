@@ -43,6 +43,10 @@
                             <button class="nav nav-link button-hover" onclick="exportSongs()" data-toggle="tooltip" data-placement="right" title="Export all songs to a folder (Apple Music by default)">
                                 <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-folder-move"></i></h5>
                             </button>
+                            <!-- Shown once a new KDL version is ready (or available, where it can't install itself) -->
+                            <button id="appUpdateButton" class="nav nav-link button-hover" onclick="installAppUpdate()" data-toggle="tooltip" data-placement="right" style="display: none;">
+                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-arrow-up-circle" style="color: #0acb8e;"></i></h5>
+                            </button>
                         </div>
                     </nav>
                 </header>
@@ -1186,7 +1190,7 @@
         // Delete all
         // Ask before doing something that can't be undone. Resolves true if confirmed.
         // Cancel has focus, so Enter or Escape won't confirm by accident
-        function confirmDialog(title, text, confirmLabel)
+        function confirmDialog(title, text, confirmLabel, confirmClass = "btn-danger")
         {
             var dialog = document.getElementById("confirmDialog");
             var confirmButton = document.getElementById("confirmDialogConfirm");
@@ -1194,6 +1198,7 @@
             document.getElementById("confirmDialogTitle").textContent = title;
             document.getElementById("confirmDialogText").textContent = text;
             confirmButton.textContent = confirmLabel;
+            confirmButton.className = "btn " + confirmClass;
 
             return new Promise(resolve =>
             {
@@ -1490,5 +1495,39 @@
                 openCredentialsDialog(message);
             }
         });
+
+        // App updates. Main checks GitHub for a new release and downloads it in the background
+        var appUpdate = null;
+        ipc.on("appUpdate", function(event, update)
+        {
+            appUpdate = update;
+            var button = document.getElementById("appUpdateButton");
+            button.title = update.status == "ready" ? `KDL ${update.version} is ready, click to restart and update`
+                                                    : `KDL ${update.version} is available, click to download it`;
+            button.style.display = "";
+        });
+
+        async function installAppUpdate()
+        {
+            if (appUpdate.status != "ready")
+            {
+                var text = (appUpdate.reason ? appUpdate.reason + ". " : "") + "Download the new version from GitHub?";
+                if (await confirmDialog(`KDL ${appUpdate.version} is available`, text, "Download", "btn-primary"))
+                {
+                    require("electron").shell.openExternal(appUpdate.url);
+                }
+                return;
+            }
+
+            var text = "KDL restarts to update. It also updates by itself the next time you quit it.";
+            if (document.getElementById("downloadLogo").classList.contains("mdi-spin"))
+            {
+                text += " The download in progress will be stopped.";
+            }
+            if (await confirmDialog(`KDL ${appUpdate.version} is ready`, text, "Restart", "btn-primary"))
+            {
+                ipc.send("installAppUpdate");
+            }
+        }
     </script>
 </html>

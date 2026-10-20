@@ -27,6 +27,17 @@ module.exports = {
       config: {},
     },
   ],
+  // npm run publish uploads the builds to a GitHub release (needs a GITHUB_TOKEN), which installed copies update from.
+  // Not a draft, so the release is "latest" (what the app checks) right away
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: { owner: 'KartikUppalapati', name: 'KDL' },
+        draft: false,
+      },
+    },
+  ],
   plugins: [
     {
       name: '@electron-forge/plugin-auto-unpack-natives',

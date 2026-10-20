@@ -23,3 +23,15 @@ Then run the following command to create an executable of the application:
 ```bash
 npm run make
 ```
+
+## Releasing updates
+
+Installed copies check GitHub for a newer release once a day and update themselves. On macOS the new version is downloaded in the background and installed when KDL quits (or right away with the green update button). Windows uses the Squirrel installer's updater, and on Linux the button links to the release.
+
+To release a new version, bump `version` in package.json, then run:
+
+```bash
+GITHUB_TOKEN=<token with access to the repo's contents> npm run publish
+```
+
+This builds KDL and uploads it to a GitHub release named after the version. Each platform's files have to be built on that platform, so run it on a Mac and on Windows to publish both.
