@@ -28,6 +28,9 @@
                         
                         <!-- Profile Area -->
                         <div class="navbar-right">
+                            <button class="nav nav-link button-hover" onclick="openCredentialsDialog()" data-toggle="tooltip" data-placement="right" title="Spotify credentials">
+                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-key-variant"></i></h5>
+                            </button>
                             <button class="nav nav-link button-hover" onclick="deleteSongs()" data-toggle="tooltip" data-placement="right" title="Delete all songs">
                                 <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-delete"></i></h5>
                             </button>
@@ -65,25 +68,47 @@
                                                 <!-- Link -->
                                                 <input id="downloadLink" class="form-control" type="text">
 
+                                                <!-- Stop, only shown while downloading (see setDownloading) -->
+                                                <div id="stopDownloadButton" class="input-group-append" style="display: none;">
+                                                    <span class="input-group-text button-hover" style="cursor: pointer;" onclick="stopDownload()" title="Stop download">
+                                                        <i class="mdi mdi-stop" style="color: var(--danger);"></i>
+                                                    </span>
+                                                </div>
+
                                                 <!-- Settings -->
                                                 <div class="input-group-append">
                                                     <div class="dropdown">
                                                         <p class="dropdown-toggle input-group-text" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                                            <i id="downloadLogo" class="mdi mdi-settings"></i>
+                                                            <i id="settingsLogo" class="mdi mdi-settings"></i>
                                                         </p>
                                 
                                                         <div class="dropdown-menu" aria-labelledby="dropdownMenuLink" x-placement="bottom-end" style="position: absolute; transform: translate3d(0px, 40px, 0px); top: 0px; left: 0px; will-change: transform;">
-                                                            <h6 class="mt-2 ml-3 mb-2 mr-1" style="cursor: pointer;" onclick="settingsToggle('audioOnly')">
-                                                                audio-only
-                                                                <i id="audioOnlySetting" data-setting="1" class="mdi mdi-checkbox-marked-circle" style="color: var(--success);"></i>
+                                                            <!-- Settings are saved between launches, the icons are set by renderSettings() -->
+                                                            <h6 class="mt-2 ml-3 mb-2 mr-3 setting-row" onclick="settingsToggle('cutSponsored')" title="Cut sponsored segments and non-music parts (intros, outros, talking) out of videos. Uses SponsorBlock, so only works if someone marked the video">
+                                                                cut-sponsored
+                                                                <i id="cutSponsoredSetting" class="mdi"></i>
                                                             </h6>
-                                                            <h6 class="mt-2 ml-3 mb-2 mr-1" style="cursor: pointer;" onclick="settingsToggle('noWarnings')">
+                                                            <h6 class="mt-2 ml-3 mb-2 mr-3 setting-row" onclick="settingsToggle('wholePlaylist')" title="Off: a link with &amp;list= only downloads its one video. On: downloads the whole playlist or mix">
+                                                                whole-playlist
+                                                                <i id="wholePlaylistSetting" class="mdi"></i>
+                                                            </h6>
+                                                            <h6 class="mt-2 ml-3 mb-2 mr-3 setting-row" onclick="settingsToggle('noWarnings')" title="Don't show yt-dlp's warnings in the download log">
                                                                 no-warnings
-                                                                <i id="noWarningsSetting" data-setting="1" class="mdi mdi-checkbox-marked-circle" style="color: var(--success);"></i>
+                                                                <i id="noWarningsSetting" class="mdi"></i>
                                                             </h6>
-                                                            <h6 class="mt-2 ml-3 mb-2 mr-1" style="cursor: pointer;" onclick="settingsToggle('ignoreErrors')">
+                                                            <h6 class="mt-2 ml-3 mb-2 mr-3 setting-row" onclick="settingsToggle('ignoreErrors')" title="Keep going past videos that fail in a playlist">
                                                                 ignore-errors
-                                                                <i id="ignoreErrorsSetting" data-setting="1" class="mdi mdi-checkbox-marked-circle" style="color: var(--success);"></i>
+                                                                <i id="ignoreErrorsSetting" class="mdi"></i>
+                                                            </h6>
+                                                            <h6 class="mt-2 ml-3 mb-2 mr-3 setting-row" onclick="settingsToggle('audioOnly')" title="MP3 instead of MP4 video">
+                                                                audio-only
+                                                                <i id="audioOnlySetting" class="mdi"></i>
+                                                            </h6>
+                                                            <h6 id="audioQualityRow" class="mt-2 ml-3 mb-2 mr-3" style="white-space: nowrap;" title="MP3 quality: high ~260 kbps, medium ~140 kbps, low ~75 kbps">
+                                                                audio-quality:
+                                                                <span class="quality-option" data-quality="high" onclick="setAudioQuality('high')">high</span>
+                                                                <span class="quality-option" data-quality="medium" onclick="setAudioQuality('medium')">medium</span>
+                                                                <span class="quality-option" data-quality="low" onclick="setAudioQuality('low')">low</span>
                                                             </h6>
                                                         </div>
                                                     </div>
@@ -197,6 +222,65 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm modal, filled in and opened by confirmDialog() -->
+        <div id="confirmDialog" class="dialog-backdrop" style="display: none;">
+            <div class="card card-default dialog-card">
+                <div class="card-body">
+                    <h5 id="confirmDialogTitle" class="mb-2"></h5>
+                    <p id="confirmDialogText" class="mb-3" style="font-size: 13px;"></p>
+                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        <button id="confirmDialogCancel" class="btn btn-light">Cancel</button>
+                        <button id="confirmDialogConfirm" class="btn btn-danger"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spotify credentials modal -->
+        <div id="credentialsDialog" class="dialog-backdrop" style="display: none;" onclick="if (event.target == this) closeCredentialsDialog()">
+            <div class="card card-default dialog-card">
+                <div class="card-body">
+                    <h5 class="mb-2">Spotify credentials</h5>
+                    <p class="mb-3" style="font-size: 13px;">
+                        Create an app in the <a href="#" onclick="openSpotifyDashboard(); return false;">Spotify developer dashboard</a>
+                        and paste its Client ID and Client Secret here. They're only saved on this computer.
+                    </p>
+
+                    <!-- Client ID -->
+                    <div class="input-group mb-1">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                <i class="mdi mdi-account-key"></i>
+                            </span>
+                        </div>
+                        <input id="credentialsClientId" class="form-control" type="text" placeholder="Client ID" spellcheck="false">
+                    </div>
+
+                    <!-- Client Secret, hidden unless the eye is clicked -->
+                    <div class="input-group mb-1">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                <i class="mdi mdi-lock"></i>
+                            </span>
+                        </div>
+                        <input id="credentialsClientSecret" class="form-control" type="password" placeholder="Client Secret" spellcheck="false">
+                        <div class="input-group-append">
+                            <span class="input-group-text" style="cursor: pointer;" onclick="toggleSecretVisible()" title="Show/hide">
+                                <i id="credentialsSecretEye" class="mdi mdi-eye"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <p id="credentialsStatus" class="mt-2 mb-2" style="font-size: 13px; min-height: 20px;"></p>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        <button class="btn btn-light" onclick="closeCredentialsDialog()">Cancel</button>
+                        <button id="credentialsSaveButton" class="btn btn-primary" onclick="saveCredentials()">Save</button>
                     </div>
                 </div>
             </div>
@@ -372,6 +456,7 @@
             var msg = document.createElement("div");
             msg.setAttribute("class", "successMessage");
             msg.appendChild(document.createTextNode("Success! " + text));
+            msg.title = "Success! " + text;
             
             // Remove prev message
             try
@@ -398,6 +483,7 @@
             var msg = document.createElement("div");
             msg.setAttribute("class", "errorMessage");
             msg.appendChild(document.createTextNode("Error! " + text));
+            msg.title = "Error! " + text;
 
             // Remove prev message
             try
@@ -416,16 +502,27 @@
             }, 1500);
         };
 
+        // A song's row (the div holding its metadata) by file name, or null if it isn't in the list
+        function findFileRow(fileName)
+        {
+            for (let i = 0; i < folderFiles.children.length; i++)
+            {
+                var songDiv = folderFiles.children[i].children[1];
+                if (songDiv.getAttribute("data-file-name") == fileName)
+                {
+                    return songDiv;
+                }
+            }
+            return null;
+        }
+
         // Add a file to the end of the list, unless it's already there. Returns whether it was added.
         // insertAdjacentHTML leaves the other rows (and their scanned metadata) untouched
         function addFileRow(fileName)
         {
-            for (let i = 0; i < folderFiles.children.length; i++)
+            if (findFileRow(fileName))
             {
-                if (folderFiles.children[i].children[1].getAttribute("data-file-name") == fileName)
-                {
-                    return false;
-                }
+                return false;
             }
 
             // Clicking anywhere on a song searches spotify for it, the copy button stops its click from also doing that
@@ -440,7 +537,12 @@
                 <div class="row" data-file-name="${escapeHtml(fileName)}"
                 data-song-image="" data-song-title="" data-song-artist="" data-song-album="">
                     <div style="padding-left: 15px;">
-                        <img src="" width="65" height="65">
+                        <!-- Play/pause over the cover, its click doesn't also search spotify -->
+                        <div class="song-cover" onclick="event.stopPropagation(); togglePlay(this.closest('.row'))" title="Play a 15s preview">
+                            <img src="" width="65" height="65">
+                            <i class="mdi mdi-play song-cover-button"></i>
+                            <div class="song-cover-progress"></div>
+                        </div>
                     </div>
                     <div class="col" style="min-width: 0; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
                         Title: </br>
@@ -465,6 +567,29 @@
             files.forEach(addFileRow);
         });
 
+        // The songs folder changed outside the app (e.g. files deleted in Finder): remove rows for files that are gone.
+        // New files are only added when no download is running, since downloads add (and scan) their own songs
+        ipc.on("folderChanged", function(event, files)
+        {
+            var present = new Set(files);
+            [...folderFiles.children].forEach(entry =>
+            {
+                if (!present.has(entry.children[1].getAttribute("data-file-name")))
+                {
+                    entry.remove();
+                }
+            });
+            if (playingRow && !playingRow.isConnected)
+            {
+                stopPlayback();
+            }
+
+            if (!document.getElementById("downloadLogo").classList.contains("mdi-spin"))
+            {
+                files.forEach(addFileRow);
+            }
+        });
+
         // Show the folder list's scrollbar only while scrolling, hidden again a second after it stops (see index.css)
         var scrollbarTimeout = null;
         folderFiles.addEventListener("scroll", function()
@@ -484,7 +609,7 @@
 
             if (addFileRow(fileName))
             {
-                scanSong(folderFiles.children.length - 1);
+                scanSong(findFileRow(fileName));
 
                 // Follow along at the bottom, stay put if scrolled up (e.g. fixing a song mid download)
                 if (wasAtBottom)
@@ -526,13 +651,32 @@
         });
 
         // Songs were added as they finished, this just catches any that were missed (even when some videos failed)
-        ipc.on("downloadCompleted", function(event, code)
+        // Spin the download icon and show the stop button while downloading
+        function setDownloading(downloading)
         {
-            document.getElementById("downloadLogo").classList.remove("mdi-spin");
+            document.getElementById("downloadLogo").classList.toggle("mdi-spin", downloading);
+            document.getElementById("stopDownloadButton").style.display = downloading ? "" : "none";
+        }
+
+        // Main kills yt-dlp, keeps the songs that already finished and removes the partial ones
+        function stopDownload()
+        {
+            ipc.send("stopDownload");
+            setDownloadLog("Stopping...");
+        }
+
+        // stopped is true when the stop button ended it
+        ipc.on("downloadCompleted", function(event, code, stopped)
+        {
+            setDownloading(false);
             ipc.send("getFilesInFolder", {});
 
             // Shown in the download log (not the top message), in the same colors as successMessage/errorMessage
-            if (code == 0)
+            if (stopped)
+            {
+                setDownloadLog("Download stopped.");
+            }
+            else if (code == 0)
             {
                 setDownloadLog("Download Completed!", "var(--success)");
             }
@@ -576,15 +720,14 @@
         });
 
         // Update song data
-        ipc.on("songScan", function(event, songResults, index)
+        ipc.on("songScan", function(event, songResults, fileName)
         {
-            // Get song div, list may have changed since the scan started
-            var child = folderFiles.children[index];
-            if (!child)
+            // Get song div, the file may have been deleted since the scan started
+            var songDiv = findFileRow(fileName);
+            if (!songDiv)
             {
                 return;
             }
-            var songDiv = child.children[1];
 
             // Use the result that best matches the file name
             var { track, confident } = pickBestTrack(cleanSongName(songDiv.getAttribute("data-file-name")), songResults.tracks?.items || []);
@@ -617,6 +760,147 @@
         });
 
         // Show status message
+        // One shared player for the folder list, so starting a song stops the one before.
+        // It plays a short preview, starting a third of the way in to skip intros
+        var songPlayer = new Audio();
+        var playingRow = null;
+        var songsFolder = null;
+        var previewSeconds = 15;
+        var previewStart = 0;
+        var previewEnd = 0;
+
+        // Play a song's preview from its row, or pause/resume it if it's the one already loaded
+        async function togglePlay(songDiv)
+        {
+            if (playingRow == songDiv)
+            {
+                songPlayer.paused ? songPlayer.play() : songPlayer.pause();
+                return;
+            }
+
+            stopPlayback();
+            songsFolder = songsFolder || await ipc.invoke("getSongsFolder");
+
+            // pathToFileURL escapes names with #, ?, spaces etc.
+            var filePath = require("path").join(songsFolder, songDiv.getAttribute("data-file-name"));
+            songPlayer.src = require("url").pathToFileURL(filePath).href;
+            playingRow = songDiv;
+        }
+
+        // Once the song's length is known, jump to the preview and play it.
+        // Songs too short for a preview from a third in start earlier, ones under 15s play whole
+        songPlayer.addEventListener("loadedmetadata", () =>
+        {
+            if (!playingRow)
+            {
+                return;
+            }
+            var duration = songPlayer.duration;
+            previewStart = Math.max(0, Math.min(duration / 3, duration - previewSeconds));
+            previewEnd = Math.min(duration, previewStart + previewSeconds);
+            songPlayer.currentTime = previewStart;
+            songPlayer.play().catch(() => {});
+        });
+
+        // The mouse is usually still on a cover when it should go back to normal (it was just clicked),
+        // so keep its hover button hidden until the mouse leaves
+        function hideHoverUntilLeave(cover)
+        {
+            cover.classList.add("hover-off");
+            cover.addEventListener("mouseleave", () => cover.classList.remove("hover-off"), { once: true });
+        }
+
+        // Preview over: stop, and put the cover back to normal
+        function finishPreview()
+        {
+            var cover = playingRow.querySelector(".song-cover");
+            stopPlayback();
+            hideHoverUntilLeave(cover);
+        }
+
+        // Stop and unload, so the file isn't held open (Windows can't delete or save over a playing file)
+        function stopPlayback()
+        {
+            // Cleared before redrawing it, so it no longer counts as the loaded song
+            var stoppedRow = playingRow;
+            playingRow = null;
+            clearTimeout(pausedTimeout);
+            if (stoppedRow)
+            {
+                setPlayButton(stoppedRow, false, 0);
+            }
+            songPlayer.pause();
+            songPlayer.removeAttribute("src");
+            songPlayer.load();
+        }
+
+        // Pause icon while playing, play icon otherwise. The button stays visible for the loaded song (even paused). Progress is 0 to 1
+        function setPlayButton(songDiv, playing, progress)
+        {
+            var cover = songDiv.querySelector(".song-cover");
+            cover.classList.toggle("loaded", songDiv == playingRow);
+            cover.title = playing ? "Pause" : "Play a 15s preview";
+            cover.querySelector(".song-cover-button").className = "mdi song-cover-button " + (playing ? "mdi-pause" : "mdi-play");
+            if (progress !== undefined)
+            {
+                cover.querySelector(".song-cover-progress").style.width = (progress * 100) + "%";
+            }
+        }
+
+        // A paused song's button goes away after a few seconds (its progress bar stays, and clicking the cover still resumes it)
+        var pausedTimeout = null;
+        songPlayer.addEventListener("pause", () =>
+        {
+            if (!playingRow)
+            {
+                return;
+            }
+            setPlayButton(playingRow, false);
+            clearTimeout(pausedTimeout);
+            pausedTimeout = setTimeout(() =>
+            {
+                if (playingRow && songPlayer.paused)
+                {
+                    var cover = playingRow.querySelector(".song-cover");
+                    cover.classList.remove("loaded");
+                    hideHoverUntilLeave(cover);
+                }
+            }, 3000);
+        });
+        songPlayer.addEventListener("play", () =>
+        {
+            clearTimeout(pausedTimeout);
+            if (playingRow)
+            {
+                playingRow.querySelector(".song-cover").classList.remove("hover-off");
+                setPlayButton(playingRow, true);
+            }
+        });
+        songPlayer.addEventListener("ended", () => playingRow && finishPreview());
+
+        // Progress is through the preview, not the whole song
+        songPlayer.addEventListener("timeupdate", () =>
+        {
+            if (!playingRow || !songPlayer.duration)
+            {
+                return;
+            }
+            if (songPlayer.currentTime >= previewEnd)
+            {
+                finishPreview();
+                return;
+            }
+            setPlayButton(playingRow, !songPlayer.paused, (songPlayer.currentTime - previewStart) / (previewEnd - previewStart));
+        });
+        songPlayer.addEventListener("error", () =>
+        {
+            if (playingRow)
+            {
+                errorMessage("Couldn't play " + playingRow.getAttribute("data-file-name"));
+                stopPlayback();
+            }
+        });
+
         // Show or hide the question mark for a scan result that may be the wrong song
         function setMatchUnsure(songDiv, unsure)
         {
@@ -649,14 +933,10 @@
         // Update one file's icon as it finishes saving
         ipc.on("songSaved", function(event, fileName, status)
         {
-            for (let i = 0; i < folderFiles.children.length; i++)
+            var songDiv = findFileRow(fileName);
+            if (songDiv)
             {
-                var songDiv = folderFiles.children[i].children[1];
-                if (songDiv.getAttribute("data-file-name") == fileName)
-                {
-                    setSaveStatus(songDiv, status);
-                    return;
-                }
+                setSaveStatus(songDiv, status);
             }
         });
 
@@ -682,10 +962,13 @@
         // Display error message
         ipc.on("songSearchFail", function(event, message)
         {
-            // Show fail
+            // Show fail. No message means the credentials dialog is explaining it instead
             spotifyResults.innerHTML = "";
             document.getElementById("spotifyLogo").classList.remove("mdi-spin");
-            errorMessage(message);
+            if (message)
+            {
+                errorMessage(message);
+            }
         });
 
         // Display error message
@@ -705,6 +988,7 @@
             }
 
             successMessage("All songs deleted.");
+            stopPlayback();
             folderFiles.innerHTML = "";
         });
 
@@ -736,11 +1020,12 @@
                 return;
             }
             
+            stopPlayback();
             ipc.send("saveSongs", fileList);
         }
 
         // Scan all
-        // Allowed during a download: finished songs are already in the list, and new rows only go at the end
+        // Allowed during a download: results are matched to songs by file name, so the list can change meanwhile
         function scanSongs()
         {
             if (folderFiles.children.length == 0)
@@ -751,19 +1036,53 @@
 
             for (let i = 0; i < folderFiles.children.length; i++)
             {
-                scanSong(i);
+                scanSong(folderFiles.children[i].children[1]);
             }
         }
 
-        // Look up one song in the list on spotify, the result comes back in songScan
-        function scanSong(index)
+        // Look up one song on spotify, the result comes back in songScan with its file name
+        function scanSong(songDiv)
         {
-            var songDiv = folderFiles.children[index].children[1];
-            ipc.send("scanSong", cleanSongName(songDiv.getAttribute("data-file-name")), index);
+            var fileName = songDiv.getAttribute("data-file-name");
+            ipc.send("scanSong", cleanSongName(fileName), fileName);
         }
 
         // Delete all
-        function deleteSongs()
+        // Ask before doing something that can't be undone. Resolves true if confirmed.
+        // Cancel has focus, so Enter or Escape won't confirm by accident
+        function confirmDialog(title, text, confirmLabel)
+        {
+            var dialog = document.getElementById("confirmDialog");
+            var confirmButton = document.getElementById("confirmDialogConfirm");
+            var cancelButton = document.getElementById("confirmDialogCancel");
+            document.getElementById("confirmDialogTitle").textContent = title;
+            document.getElementById("confirmDialogText").textContent = text;
+            confirmButton.textContent = confirmLabel;
+
+            return new Promise(resolve =>
+            {
+                function close(confirmed)
+                {
+                    dialog.style.display = "none";
+                    document.removeEventListener("keydown", onKeydown);
+                    resolve(confirmed);
+                }
+                function onKeydown(event)
+                {
+                    if (event.key == "Escape") close(false);
+                }
+
+                confirmButton.onclick = () => close(true);
+                cancelButton.onclick = () => close(false);
+                dialog.onclick = (event) => { if (event.target == dialog) close(false); };
+                document.addEventListener("keydown", onKeydown);
+
+                dialog.style.display = "";
+                cancelButton.focus();
+            });
+        }
+
+        async function deleteSongs()
         {
             if (document.getElementById("downloadLogo").classList.contains("mdi-spin"))
             {
@@ -771,7 +1090,21 @@
                 return;
             }
 
-            ipc.send("deleteSongs", {});
+            var count = folderFiles.children.length;
+            if (count == 0)
+            {
+                errorMessage("No songs to delete!");
+                return;
+            }
+
+            var confirmed = await confirmDialog("Delete all songs?",
+                `This deletes all ${count} ${count == 1 ? "song" : "songs"} in the TempKdlFiles folder from your computer. It can't be undone.`,
+                "Delete");
+            if (confirmed)
+            {
+                stopPlayback();
+                ipc.send("deleteSongs", {});
+            }
         }
 
         // Open folder
@@ -780,27 +1113,77 @@
             ipc.send("openSongsFolder", {});
         }
 
-        // Update icon
-        function settingsToggle(id)
+        // Download settings, sent with each download and saved between launches.
+        // Defaults are used for anything not saved yet (e.g. settings added in a newer version)
+        var defaultDownloadSettings =
         {
-            var setting = document.getElementById(id + "Setting");
-
-            // Turn off
-            if (setting.classList.contains("mdi-checkbox-marked-circle"))
-            {
-                setting.style.color = "";
-                setting.classList.remove("mdi-checkbox-marked-circle");
-                setting.classList.add("mdi-checkbox-blank-circle-outline");
-                setting.setAttribute("data-setting", "0");
-                return;
-            }
-
-            // Turn on
-            setting.classList.remove("mdi-checkbox-blank-circle-outline");
-            setting.classList.add("mdi-checkbox-marked-circle");
-            setting.setAttribute("data-setting", "1");
-            setting.style.color = "var(--success)";
+            audioOnly: true,
+            audioQuality: "high",
+            wholePlaylist: false,
+            cutSponsored: false,
+            noWarnings: true,
+            ignoreErrors: true
+        };
+        var downloadSettings = { ...defaultDownloadSettings };
+        try
+        {
+            Object.assign(downloadSettings, JSON.parse(localStorage.getItem("downloadSettings") || "{}"));
         }
+        catch (error) {}
+
+        // Quality used to be called best/good/small
+        downloadSettings.audioQuality = { best: "high", good: "medium", small: "low" }[downloadSettings.audioQuality] || downloadSettings.audioQuality;
+
+        // cut-sponsored used to be cut-non-music
+        if ("removeNonMusic" in downloadSettings)
+        {
+            downloadSettings.cutSponsored = downloadSettings.removeNonMusic;
+            delete downloadSettings.removeNonMusic;
+        }
+
+        function saveDownloadSettings()
+        {
+            try
+            {
+                localStorage.setItem("downloadSettings", JSON.stringify(downloadSettings));
+            }
+            catch (error) {}
+        }
+
+        // Show the settings in the dropdown: filled green circle = on, quality choice in green
+        function renderSettings()
+        {
+            ["cutSponsored", "wholePlaylist", "noWarnings", "ignoreErrors", "audioOnly"].forEach(key =>
+            {
+                var icon = document.getElementById(key + "Setting");
+                icon.className = "mdi " + (downloadSettings[key] ? "mdi-checkbox-marked-circle" : "mdi-checkbox-blank-circle-outline");
+                icon.style.color = downloadSettings[key] ? "var(--success)" : "";
+            });
+
+            document.querySelectorAll(".quality-option").forEach(option =>
+            {
+                option.classList.toggle("selected", option.getAttribute("data-quality") == downloadSettings.audioQuality);
+            });
+
+            // Quality only applies to mp3s
+            document.getElementById("audioQualityRow").classList.toggle("setting-unused", !downloadSettings.audioOnly);
+        }
+
+        function settingsToggle(key)
+        {
+            downloadSettings[key] = !downloadSettings[key];
+            saveDownloadSettings();
+            renderSettings();
+        }
+
+        function setAudioQuality(quality)
+        {
+            downloadSettings.audioQuality = quality;
+            saveDownloadSettings();
+            renderSettings();
+        }
+
+        renderSettings();
 
         // Update metadata fields
         function selectSong(songDiv)
@@ -850,11 +1233,8 @@
         {
             if (event.key == "Enter") 
             {
-                document.getElementById("downloadLogo").classList.add("mdi-spin");
-                ipc.send("downloadFromLink", downloadLink.value,
-                document.getElementById("audioOnlySetting").getAttribute("data-setting"),
-                document.getElementById("noWarningsSetting").getAttribute("data-setting"),
-                document.getElementById("ignoreErrorsSetting").getAttribute("data-setting"));
+                setDownloading(true);
+                ipc.send("downloadFromLink", downloadLink.value, downloadSettings);
             }
         });
 
@@ -893,5 +1273,93 @@
 
             ipc.send("searchSong", spotifySearch.value);
         }
+
+        // Spotify credentials dialog
+        var credentialsDialog = document.getElementById("credentialsDialog");
+        var credentialsClientId = document.getElementById("credentialsClientId");
+        var credentialsClientSecret = document.getElementById("credentialsClientSecret");
+        var credentialsStatus = document.getElementById("credentialsStatus");
+
+        // Show a line under the fields, red for problems, green when it worked
+        function setCredentialsStatus(text, color = "")
+        {
+            credentialsStatus.textContent = text;
+            credentialsStatus.style.color = color;
+        }
+
+        // Open with the saved Client ID filled in. The saved secret is never sent to the page, so its field starts empty.
+        // message explains why it opened by itself (e.g. a search needed credentials)
+        async function openCredentialsDialog(message = "")
+        {
+            var saved = await ipc.invoke("getSpotifyCredentials");
+            credentialsClientId.value = saved.clientId;
+            credentialsClientSecret.value = "";
+            credentialsClientSecret.placeholder = saved.hasSecret ? "Saved (leave empty to keep it)" : "Client Secret";
+            credentialsClientSecret.type = "password";
+            document.getElementById("credentialsSecretEye").className = "mdi mdi-eye";
+            setCredentialsStatus(message, message ? "var(--danger)" : "");
+
+            credentialsDialog.style.display = "";
+            (credentialsClientId.value ? credentialsClientSecret : credentialsClientId).focus();
+        }
+
+        function closeCredentialsDialog()
+        {
+            credentialsDialog.style.display = "none";
+        }
+
+        // Main checks them with spotify and only saves them if they work
+        async function saveCredentials()
+        {
+            var saveButton = document.getElementById("credentialsSaveButton");
+            setCredentialsStatus("Checking with Spotify...");
+            saveButton.disabled = true;
+
+            var result = await ipc.invoke("saveSpotifyCredentials", credentialsClientId.value, credentialsClientSecret.value);
+            saveButton.disabled = false;
+
+            if (result.ok)
+            {
+                closeCredentialsDialog();
+                successMessage("Credentials saved!");
+            }
+            else
+            {
+                setCredentialsStatus(result.message, "var(--danger)");
+            }
+        }
+
+        function toggleSecretVisible()
+        {
+            var showing = credentialsClientSecret.type == "text";
+            credentialsClientSecret.type = showing ? "password" : "text";
+            document.getElementById("credentialsSecretEye").className = showing ? "mdi mdi-eye" : "mdi mdi-eye-off";
+        }
+
+        // Open in the normal browser, not inside the app window
+        function openSpotifyDashboard()
+        {
+            require("electron").shell.openExternal("https://developer.spotify.com/dashboard");
+        }
+
+        // Enter saves, Escape closes
+        [credentialsClientId, credentialsClientSecret].forEach(input => input.addEventListener("keydown", function(event)
+        {
+            if (event.key == "Enter") saveCredentials();
+        }));
+        document.addEventListener("keydown", function(event)
+        {
+            if (event.key == "Escape" && credentialsDialog.style.display != "none") closeCredentialsDialog();
+        });
+
+        // A search or scan needed credentials (missing or rejected), so ask for them.
+        // Scans send this once per song, so only open it if it isn't open already
+        ipc.on("spotifyCredentialsNeeded", function(event, message)
+        {
+            if (credentialsDialog.style.display == "none")
+            {
+                openCredentialsDialog(message);
+            }
+        });
     </script>
 </html>

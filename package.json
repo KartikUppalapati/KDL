@@ -16,8 +16,8 @@
   "license": "MIT",
   "dependencies": {
     "electron-squirrel-startup": "^1.0.0",
-    "extract-zip": "^2.0.1",
-    "node-id3": "^0.2.9"
+    "node-id3": "^0.2.9",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",
@@ -27,5 +27,8 @@
     "@electron-forge/maker-zip": "^8.0.1",
     "@electron-forge/plugin-auto-unpack-natives": "^8.0.1",
     "electron": "27.0.3"
+  },
+  "overrides": {
+    "yauzl": "^3.4.0"
   }
 }

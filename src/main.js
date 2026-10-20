@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut } = require('electron');
+const { app, BrowserWindow, dialog, globalShortcut, safeStorage } = require('electron');
 const { exec, spawn } = require('node:child_process');
 var ipc = require('electron').ipcMain;
 const nodeid3 = require('node-id3');
@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
-const extractZip = require('extract-zip');
+const yauzl = require('yauzl');
 const { Readable, Transform } = require('stream');
 const { pipeline } = require('stream/promises');
 
@@ -87,8 +87,6 @@ app.on('activate', () =>
 
 // Init vars
 const platform = process.platform;
-const spotify_client_id="6d3c6efcc74b4891981593966033ec76"
-const spotify_client_secret="530dcb7cc7dd43e2bf0e5ff4ebad6be2"
 const defaultFolderPath = path.join(os.homedir(), "TempKdlFiles");
 
 // yt-dlp, ffmpeg and deno are downloaded on first use into the user data folder (app bundle may not be writable)
@@ -194,6 +192,65 @@ async function downloadFFmpeg(onOutput)
     }
 }
 
+// Unzip zipPath into dir, keeping executable permissions (and symlinks, should a zip ever have them).
+// Uses yauzl 3 directly: extract-zip 2 (yauzl 2) silently stalls on newer Node versions
+function extractZip(zipPath, dir)
+{
+    return new Promise((resolve, reject) =>
+    {
+        yauzl.open(zipPath, { lazyEntries: true }, (error, zip) =>
+        {
+            if (error) return reject(error);
+            zip.on("error", reject);
+            zip.on("end", resolve);
+
+            // One entry at a time, the next is read once this one is written
+            zip.on("entry", async (entry) =>
+            {
+                try
+                {
+                    // Never write outside dir
+                    const dest = path.resolve(dir, entry.fileName);
+                    if (!dest.startsWith(path.resolve(dir) + path.sep))
+                    {
+                        throw new Error(`Bad path in zip: ${entry.fileName}`);
+                    }
+
+                    // Unix file type and permissions are in the top 16 bits
+                    const unixMode = entry.externalFileAttributes >>> 16;
+                    const fileType = unixMode & 0o170000;
+                    if (entry.fileName.endsWith("/") || fileType == 0o040000)
+                    {
+                        fs.mkdirSync(dest, { recursive: true });
+                        return zip.readEntry();
+                    }
+
+                    fs.mkdirSync(path.dirname(dest), { recursive: true });
+                    const stream = await new Promise((res, rej) => zip.openReadStream(entry, (e, s) => e ? rej(e) : res(s)));
+                    if (fileType == 0o120000)
+                    {
+                        // A symlink's content is the path it points to
+                        const chunks = [];
+                        for await (const chunk of stream) chunks.push(chunk);
+                        fs.symlinkSync(Buffer.concat(chunks).toString(), dest);
+                    }
+                    else
+                    {
+                        await pipeline(stream, fs.createWriteStream(dest, { mode: (unixMode & 0o777) || 0o644 }));
+                    }
+                    zip.readEntry();
+                }
+                catch (error)
+                {
+                    zip.close();
+                    reject(error);
+                }
+            });
+            zip.readEntry();
+        });
+    });
+}
+
 // Download a zip, check it against expectedHash, and unzip it into a fresh tempDir
 async function downloadZip(url, expectedHash, tempDir, label, onOutput)
 {
@@ -207,7 +264,7 @@ async function downloadZip(url, expectedHash, tempDir, label, onOutput)
 
     onOutput(`Extracting ${label}...`);
     fs.rmSync(tempDir, { recursive: true, force: true });
-    await extractZip(zipPath, { dir: tempDir });
+    await extractZip(zipPath, tempDir);
     fs.rmSync(zipPath, { force: true });
 }
 
@@ -359,34 +416,97 @@ function ensureTools(onOutput, forceUpdateCheck = false)
     return toolsReady;
 }
 
+// Spotify credentials are entered in the app (key button at the top) and saved in the user data folder,
+// so they're never in the code or the packaged app. The secret is encrypted with the OS keychain when it can be (safeStorage)
+const credentialsPath = path.join(app.getPath("userData"), "spotify-credentials.json");
+var spotifyCredentials = null;
+
+// Saved credentials, { clientId, clientSecret }, or null if there aren't any (or they can't be read)
+function loadSpotifyCredentials()
+{
+    if (!spotifyCredentials)
+    {
+        try
+        {
+            const saved = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
+            const clientSecret = saved.encrypted ? safeStorage.decryptString(Buffer.from(saved.clientSecret, "base64")) : saved.clientSecret;
+            if (saved.clientId && clientSecret)
+            {
+                spotifyCredentials = { clientId: saved.clientId, clientSecret };
+            }
+        }
+        catch (error) {}
+    }
+    return spotifyCredentials;
+}
+
+function saveSpotifyCredentials(clientId, clientSecret)
+{
+    const encrypted = safeStorage.isEncryptionAvailable();
+    const saved =
+    {
+        clientId,
+        encrypted,
+        clientSecret: encrypted ? safeStorage.encryptString(clientSecret).toString("base64") : clientSecret
+    };
+    fs.mkdirSync(path.dirname(credentialsPath), { recursive: true });
+    fs.writeFileSync(credentialsPath, JSON.stringify(saved, null, 2), { mode: 0o600 });
+    spotifyCredentials = { clientId, clientSecret };
+}
+
+// Errors that mean the user needs to (re)enter their credentials, so the page can open the credentials dialog
+function credentialsError(message)
+{
+    const error = new Error(message);
+    error.needsCredentials = true;
+    return error;
+}
+
+// Ask spotify for a token with these credentials. Resolves with { access_token, expires_in }
+async function requestSpotifyToken(clientId, clientSecret)
+{
+    const result = await fetch("https://accounts.spotify.com/api/token",
+    {
+        method: "POST",
+        headers:
+        {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": "Basic " + btoa(`${clientId}:${clientSecret}`)
+        },
+        body: "grant_type=client_credentials"
+    });
+    const data = await result.json();
+
+    if (data.error == "invalid_client")
+    {
+        throw credentialsError("Spotify didn't accept the Client ID or Secret.");
+    }
+    if (!data.access_token)
+    {
+        throw new Error(data.error_description || "Couldn't get Spotify token.");
+    }
+    return data;
+}
+
 // Reuse the spotify token until it expires
 var spotifyToken = null;
 function getSpotifyToken()
 {
+    const credentials = loadSpotifyCredentials();
+    if (!credentials)
+    {
+        return Promise.reject(credentialsError("Add your Spotify credentials first (key button at the top)."));
+    }
+
     if (spotifyToken && Date.now() < spotifyToken.expiresAt)
     {
         return spotifyToken.promise;
     }
 
     const token = { expiresAt: Infinity };
-    token.promise = fetch("https://accounts.spotify.com/api/token",
-    {
-        method: "POST",
-        headers:
-        {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": "Basic " + btoa(`${spotify_client_id}:${spotify_client_secret}`)
-        },
-        body: "grant_type=client_credentials"
-    })
-    .then(result => result.json())
+    token.promise = requestSpotifyToken(credentials.clientId, credentials.clientSecret)
     .then(data =>
     {
-        if (!data.access_token)
-        {
-            throw new Error(data.error_description || "Couldn't get Spotify token.");
-        }
-
         // Refresh a minute early
         token.expiresAt = Date.now() + (data.expires_in - 60) * 1000;
         return data.access_token;
@@ -402,10 +522,49 @@ function getSpotifyToken()
     return token.promise;
 }
 
+// For the credentials dialog. The secret itself stays in the main process
+// For playing songs in the page (it builds file:// urls from this)
+ipc.handle("getSongsFolder", function()
+{
+    return defaultFolderPath;
+});
+
+ipc.handle("getSpotifyCredentials", function()
+{
+    const credentials = loadSpotifyCredentials();
+    return { clientId: credentials ? credentials.clientId : "", hasSecret: !!credentials };
+});
+
+// Check new credentials with spotify, and only save them if they work. An empty secret keeps the saved one
+ipc.handle("saveSpotifyCredentials", async function(event, clientId, clientSecret)
+{
+    clientId = (clientId || "").trim();
+    clientSecret = (clientSecret || "").trim() || (loadSpotifyCredentials() || {}).clientSecret;
+    if (!clientId || !clientSecret)
+    {
+        return { ok: false, message: "Enter both the Client ID and the Client Secret." };
+    }
+
+    try
+    {
+        const data = await requestSpotifyToken(clientId, clientSecret);
+        saveSpotifyCredentials(clientId, clientSecret);
+
+        // Start using the new credentials right away
+        spotifyToken = { expiresAt: Date.now() + (data.expires_in - 60) * 1000, promise: Promise.resolve(data.access_token) };
+        return { ok: true };
+    }
+    catch (error)
+    {
+        return { ok: false, message: error.cause?.errno == -3008 ? "Network connection failed." : error.message };
+    }
+});
+
 // The app only makes mp3s and mp4s (see -t in downloadFromLink)
+// (not yt-dlp's in progress files: .temp.mp3 while converting, .f137.mp4 / .f251.webm streams before merging)
 function isFinishedSong(fileName)
 {
-    return /\.(mp3|mp4)$/i.test(fileName) && !/\.temp\.(mp3|mp4)$/i.test(fileName);
+    return /\.(mp3|mp4)$/i.test(fileName) && !/\.temp\.(mp3|mp4)$/i.test(fileName) && !/\.f\d+\.\w+$/i.test(fileName);
 }
 
 ipc.on("getFilesInFolder", function(event)
@@ -427,21 +586,101 @@ ipc.on("getFilesInFolder", function(event)
         fs.mkdirSync(defaultFolderPath);
     }
 
-    const listOfFiles = [];
-    fs.readdir(defaultFolderPath, (err, files) =>
-    {
-        // Only finished songs, not yt-dlp's in progress files (.part, .temp.mp3, .f251.webm...)
-        (files || []).forEach(file =>
-        {
-            if (isFinishedSong(file))
-            {
-                listOfFiles.push(file);
-            }
-        });
-
-        event.sender.send("filesList", listOfFiles);
-    });
+    event.sender.send("filesList", listFinishedSongs());
+    watchSongsFolder(event.sender);
 });
+
+// Only finished songs, not yt-dlp's in progress files (.part, .temp.mp3, .f251.webm...)
+function listFinishedSongs()
+{
+    try
+    {
+        return fs.readdirSync(defaultFolderPath).filter(isFinishedSong);
+    }
+    catch (error)
+    {
+        return [];
+    }
+}
+
+// Watch the songs folder, so files deleted (or added) outside the app, e.g. in Finder, update the page's list.
+// A download writes lots of temp files, so wait for the changes to settle before sending the list.
+// The folder's parent is watched too: on macOS deleting the watched folder itself sends no events,
+// and it lets the folder watcher start again when the folder is re-created
+var folderWatcher = null;
+var parentWatcher = null;
+function watchSongsFolder(sender)
+{
+    var settleTimeout = null;
+    function changed()
+    {
+        clearTimeout(settleTimeout);
+        settleTimeout = setTimeout(sendList, 300);
+    }
+
+    function startFolderWatcher()
+    {
+        if (folderWatcher || !fs.existsSync(defaultFolderPath))
+        {
+            return;
+        }
+        try
+        {
+            folderWatcher = fs.watch(defaultFolderPath, changed);
+            folderWatcher.on("error", () =>
+            {
+                stopFolderWatcher();
+                changed();
+            });
+        }
+        catch (error)
+        {
+            folderWatcher = null;
+        }
+    }
+    function stopFolderWatcher()
+    {
+        if (folderWatcher)
+        {
+            folderWatcher.close();
+            folderWatcher = null;
+        }
+    }
+
+    function sendList()
+    {
+        if (fs.existsSync(defaultFolderPath))
+        {
+            startFolderWatcher();
+        }
+        else
+        {
+            stopFolderWatcher();
+        }
+        if (!sender.isDestroyed())
+        {
+            sender.send("folderChanged", listFinishedSongs());
+        }
+    }
+
+    startFolderWatcher();
+    if (!parentWatcher)
+    {
+        try
+        {
+            const folderName = path.basename(defaultFolderPath);
+            parentWatcher = fs.watch(path.dirname(defaultFolderPath), (type, name) =>
+            {
+                if (name == folderName) changed();
+            });
+            parentWatcher.on("error", () => { parentWatcher = null; });
+        }
+        catch (error)
+        {
+            parentWatcher = null;
+        }
+    }
+}
 
 ipc.on("openSongsFolder", function(event, data)
 {
@@ -562,11 +801,17 @@ ipc.on("searchSong", function(event, songName)
         {
             message = "Network connection failed."
         }
+        // The credentials dialog shows the message, so the fail only stops the page's spinner
+        if (error.needsCredentials)
+        {
+            event.sender.send("spotifyCredentialsNeeded", message);
+            message = "";
+        }
         event.sender.send("songSearchFail", message);
     });
 });
 
-ipc.on("scanSong", function(event, songName, index)
+ipc.on("scanSong", function(event, songName, fileName)
 {
     getSpotifyToken()
     .then(token =>
@@ -581,10 +826,16 @@ ipc.on("scanSong", function(event, songName, index)
     .then(result => result.json())
     .then(json =>
     {
-        event.sender.send("songScan", json, index);
+        event.sender.send("songScan", json, fileName);
     })
     .catch(error =>
     {
+        // The credentials dialog shows the message instead
+        if (error.needsCredentials)
+        {
+            event.sender.send("spotifyCredentialsNeeded", error.message);
+            return;
+        }
         event.sender.send("songScanFail", error.message);
     });
 });
@@ -633,13 +884,77 @@ ipc.on("deleteSongs", function(event)
 // yt-dlp prints this before each finished file's path (see --print in downloadFromLink)
 const finishedPrefix = "KDL_FILE:";
 
+// Downloads in progress, { stopped, process }, so the stop button (and quitting) can end them
+const activeDownloads = new Set();
+
+// Stop a download: kill yt-dlp and the ffmpeg it started (its whole process group, or tree on Windows)
+function stopDownload(download)
+{
+    download.stopped = true;
+    const child = download.process;
+    if (!child || child.exitCode !== null)
+    {
+        return;
+    }
+
+    try
+    {
+        if (platform === "win32")
+        {
+            spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"]);
+        }
+        else
+        {
+            process.kill(-child.pid, "SIGTERM");
+        }
+    }
+    catch (error)
+    {
+        child.kill();
+    }
+}
+
+ipc.on("stopDownload", function()
+{
+    activeDownloads.forEach(stopDownload);
+});
+
+// Don't leave yt-dlp downloading in the background after the app closes
+app.on("before-quit", function()
+{
+    activeDownloads.forEach(stopDownload);
+});
+
+// After a stop, remove the partial files yt-dlp leaves (.part, .ytdl, .temp.mp3, unmerged streams...).
+// Only files changed since this download started, so nothing older is touched
+function removePartialFiles(since)
+{
+    try
+    {
+        for (const file of fs.readdirSync(defaultFolderPath))
+        {
+            const filePath = path.join(defaultFolderPath, file);
+            if (!file.startsWith(".") && !isFinishedSong(file) && fs.statSync(filePath).mtimeMs >= since)
+            {
+                fs.rmSync(filePath, { force: true });
+            }
+        }
+    }
+    catch (error)
+    {
+        console.error(`Error removing partial files: ${error}`);
+    }
+}
+
 // Run yt-dlp once. Finished files go to the page's file list, the rest of the output to its download log.
 // Resolves with the exit code, and whether YouTube refused a download with a 403
-function runYtdlp(args, event)
+function runYtdlp(args, event, download)
 {
     return new Promise((resolve) =>
     {
-        const download = spawn(findYtdlp(), args);
+        // Its own process group (not on Windows), so stopping can kill ffmpeg along with it
+        const child = spawn(findYtdlp(), args, { detached: platform !== "win32" });
+        download.process = child;
         runningDownloads++;
         var forbidden = false;
 
@@ -658,13 +973,13 @@ function runYtdlp(args, event)
 
         // Output can arrive cut mid line, so keep the unfinished end until the rest comes
         var unfinishedLine = "";
-        download.stdout.on("data", (output) =>
+        child.stdout.on("data", (output) =>
         {
             var lines = (unfinishedLine + output.toString()).split(/\r?\n|\r/);
             unfinishedLine = lines.pop();
             lines.forEach(handleLine);
         });
-        download.stderr.on("data", (error) =>
+        child.stderr.on("data", (error) =>
         {
             const text = error.toString();
             if (/HTTP Error 403/i.test(text))
@@ -676,7 +991,7 @@ function runYtdlp(args, event)
 
         // Only finish once, error can fire with or without close
         var finished = false;
-        download.on("error", (error) =>
+        child.on("error", (error) =>
         {
             if (finished) return;
             finished = true;
@@ -684,7 +999,7 @@ function runYtdlp(args, event)
             event.sender.send("downloadOutput", `Couldn't start yt-dlp: ${error.message}`);
             resolve({ code: 1, forbidden: false });
         });
-        download.on("close", (code) =>
+        child.on("close", (code) =>
         {
             if (finished) return;
             finished = true;
@@ -695,9 +1010,12 @@ function runYtdlp(args, event)
     });
 }
 
-ipc.on("downloadFromLink", async function(event, link, audioOnlySetting, noWarningsSetting, ignoreErrorsSetting)
+// settings come from the page's download settings dropdown (downloadSettings in index.html)
+ipc.on("downloadFromLink", async function(event, link, settings)
 {
     const onOutput = (output) => event.sender.send("downloadOutput", output);
+    const download = { stopped: false, process: null, startedAt: Date.now() };
+    activeDownloads.add(download);
 
     // Get yt-dlp, ffmpeg and deno before downloading
     try
@@ -706,8 +1024,17 @@ ipc.on("downloadFromLink", async function(event, link, audioOnlySetting, noWarni
     }
     catch (error)
     {
+        activeDownloads.delete(download);
         onOutput(`Couldn't download yt-dlp/ffmpeg: ${error.message}`);
         event.sender.send("downloadCompleted", 1);
+        return;
+    }
+
+    // Stopped while the tools were downloading
+    if (download.stopped)
+    {
+        activeDownloads.delete(download);
+        event.sender.send("downloadCompleted", 1, true);
         return;
     }
     onOutput("Downloading...");
@@ -719,10 +1046,18 @@ ipc.on("downloadFromLink", async function(event, link, audioOnlySetting, noWarni
     // Args go straight to yt-dlp (no shell), so links with & etc. stay intact
     var args = ["--ffmpeg-location", ffmpegPath, "--sleep-interval", "5", "--download-archive", archivePath];
     if (fs.existsSync(denoPath)) args.push("--js-runtimes", `deno:${denoPath}`);
-    if (noWarningsSetting == 1) args.push("--no-warnings");
-    if (audioOnlySetting == 1) args.push("-t", "mp3");
-    if (audioOnlySetting == 0) args.push("-t", "mp4");
-    if (ignoreErrorsSetting == 1) args.push("-i");
+    if (settings.noWarnings) args.push("--no-warnings");
+    if (settings.ignoreErrors) args.push("-i");
+
+    // mp3 VBR quality: high is yt-dlp's 0 (~260 kbps), medium is 5, its default (~140 kbps), low is 9 (~75 kbps)
+    if (settings.audioOnly) args.push("-t", "mp3", "--audio-quality", { high: "0", medium: "5", low: "9" }[settings.audioQuality] || "0");
+    else args.push("-t", "mp4");
+
+    // A link copied from a playing mix/playlist has &list= in it, which would otherwise download the whole list (hundreds of videos for a mix)
+    args.push(settings.wholePlaylist ? "--yes-playlist" : "--no-playlist");
+
+    // Cut the parts SponsorBlock users marked as sponsored or not music (intros, outros, skits). Does nothing for videos nobody marked
+    if (settings.cutSponsored) args.push("--sponsorblock-remove", "sponsor,music_offtopic");
 
     // Print each file's final path once it's converted and moved, so the page can show it right away.
     // --print turns on quiet mode, --progress --newline keep the progress lines (one per line)
@@ -731,11 +1066,11 @@ ipc.on("downloadFromLink", async function(event, link, audioOnlySetting, noWarni
 
     try
     {
-        var result = await runYtdlp(args, event);
+        var result = await runYtdlp(args, event, download);
 
         // A 403 usually means yt-dlp is behind YouTube's latest changes, or the video's links expired.
         // Update yt-dlp if there's a new one and retry once, the archive skips videos that already finished
-        if (result.code !== 0 && result.forbidden)
+        if (result.code !== 0 && result.forbidden && !download.stopped)
         {
             onOutput("YouTube refused the download (403), checking for a yt-dlp update and retrying...");
             try
@@ -746,13 +1081,22 @@ ipc.on("downloadFromLink", async function(event, link, audioOnlySetting, noWarni
             {
                 onOutput(`Couldn't update yt-dlp: ${error.message}`);
             }
-            result = await runYtdlp(args, event);
+            if (!download.stopped)
+            {
+                result = await runYtdlp(args, event, download);
+            }
         }
 
-        event.sender.send("downloadCompleted", result.code);
+        // Songs that finished before the stop are kept, only the partial ones are removed
+        if (download.stopped)
+        {
+            removePartialFiles(download.startedAt);
+        }
+        event.sender.send("downloadCompleted", result.code, download.stopped);
     }
     finally
     {
+        activeDownloads.delete(download);
         fs.rmSync(archivePath, { force: true });
     }
 });

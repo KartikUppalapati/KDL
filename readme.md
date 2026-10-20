@@ -1,12 +1,8 @@
 # KDL
-<!-- 
+
 ## Setup
 
-Before running this project, you need to create a `.env` file in the root directory with your Spotify credentials like this:
-```
-SPOTIFY_CLIENT_ID="client_id_here"
-SPOTIFY_CLIENT_SECRET="secret_here"
-``` -->
+Searching Spotify needs a Client ID and Client Secret. Create an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard), then click the key button at the top of KDL and paste them in. KDL checks them with Spotify and saves them on that computer only (the secret is encrypted with the OS keychain), so they aren't in the code or the built app.
 
 ## Installation & Running
 

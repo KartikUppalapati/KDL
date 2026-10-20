@@ -2,6 +2,8 @@ module.exports = {
   packagerConfig: {
     appBundleId: 'com.karts.kdl',
     asar: true,
+    // Spotify credentials are entered in the app now, never ship an old .env with a secret in it
+    ignore: [/^\/\.env/],
     extraResource: [
       './src/dependencies',
     ],

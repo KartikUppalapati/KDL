@@ -17577,3 +17577,112 @@ li a:hover p
 {
     margin-right: 0;
 }
+
+/* Spotify credentials dialog: dims the page and centers a card on it */
+.dialog-backdrop
+{
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.35);
+}
+
+.dialog-card
+{
+    width: 440px;
+    margin: 0;
+}
+
+/* Download settings dropdown: the chosen quality is green, and settings that don't apply right now are faded */
+.quality-option
+{
+    cursor: pointer;
+    margin-left: 4px;
+}
+
+.quality-option:hover
+{
+    color: var(--primary);
+}
+
+.quality-option.selected
+{
+    color: var(--success);
+}
+
+.setting-unused
+{
+    opacity: 0.45;
+}
+
+/* Play/pause button over a song's cover in the folder list: shows on hover, stays for the loaded song (playing or paused) */
+.song-cover
+{
+    position: relative;
+    width: 65px;
+    height: 65px;
+    cursor: pointer;
+}
+
+.song-cover-button
+{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: #ffffff;
+    background-color: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.song-cover:hover .song-cover-button,
+.song-cover.loaded .song-cover-button
+{
+    opacity: 1;
+}
+
+/* How far into the song, along the bottom of the cover */
+.song-cover-progress
+{
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    height: 3px;
+    background-color: var(--primary);
+}
+
+/* A preview just ended, or a paused song's button timed out, under the mouse: keep the cover normal until the mouse leaves it */
+.song-cover.hover-off:hover .song-cover-button
+{
+    opacity: 0;
+}
+
+/* Download settings toggles: label on the left, on/off icon pushed to the right so the icons line up in one column */
+.setting-row
+{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+}
+
+/* Top messages stay on one line: as wide as the text, but never under the top-bar buttons.
+   Anything longer ends in "..." (the full text is in its tooltip, see successMessage/errorMessage) */
+div.successMessage,
+div.errorMessage
+{
+    width: max-content;
+    min-width: 250px;
+    max-width: calc(100vw - 350px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
