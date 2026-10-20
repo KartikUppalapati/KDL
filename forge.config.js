@@ -1,4 +1,22 @@
+const { execFileSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
 module.exports = {
+  hooks: {
+    // Electron's binary only has the linker's ad-hoc signature, which doesn't cover the rest of the app,
+    // so macOS calls a downloaded KDL "damaged". Re-sign the whole app ad-hoc (no Apple Developer ID needed)
+    postPackage: async (forgeConfig, options) => {
+      if (options.platform !== 'darwin') return;
+      for (const outputPath of options.outputPaths) {
+        const appName = fs.readdirSync(outputPath).find((file) => file.endsWith('.app'));
+        const appPath = path.join(outputPath, appName);
+        execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath]);
+        execFileSync('codesign', ['--verify', '--deep', '--strict', appPath]);
+      }
+    },
+  },
+
   packagerConfig: {
     appBundleId: 'com.karts.kdl',
     asar: true,
