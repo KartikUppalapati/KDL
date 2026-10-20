@@ -17686,3 +17686,25 @@ div.errorMessage
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Export modal's folder: looks like a field, clicking it picks another folder.
+   Cut off at the start (rtl + the bdi inside) so the end of the path stays visible */
+.export-folder
+{
+    cursor: pointer;
+}
+
+.export-folder-path
+{
+    direction: rtl;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background-color: #ffffff;
+}
+
+.export-folder:hover .export-folder-path
+{
+    border-color: var(--primary);
+}

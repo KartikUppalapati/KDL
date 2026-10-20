@@ -1,5 +1,5 @@
 const { app, BrowserWindow, dialog, globalShortcut, safeStorage } = require('electron');
-const { exec, spawn } = require('node:child_process');
+const { spawn } = require('node:child_process');
 var ipc = require('electron').ipcMain;
 const nodeid3 = require('node-id3');
 const path = require('path');
@@ -87,7 +87,31 @@ app.on('activate', () =>
 
 // Init vars
 const platform = process.platform;
-const defaultFolderPath = path.join(os.homedir(), "TempKdlFiles");
+
+// Songs are kept in the app's own folder (next to bin/ and the spotify credentials), not in the home folder.
+// The "Open song folder" button shows it in Finder/Explorer
+const defaultFolderPath = path.join(app.getPath("userData"), "songs");
+
+// Songs used to be in ~/TempKdlFiles, move them in the first time so none go missing.
+// If that fails (e.g. a different drive), the old folder is just left where it is
+function moveOldSongsFolder()
+{
+    const oldFolderPath = path.join(os.homedir(), "TempKdlFiles");
+    if (!fs.existsSync(oldFolderPath) || fs.existsSync(defaultFolderPath))
+    {
+        return;
+    }
+    try
+    {
+        fs.mkdirSync(path.dirname(defaultFolderPath), { recursive: true });
+        fs.renameSync(oldFolderPath, defaultFolderPath);
+    }
+    catch (error)
+    {
+        console.error(`Couldn't move ${oldFolderPath} to ${defaultFolderPath}: ${error}`);
+    }
+}
+moveOldSongsFolder();
 
 // yt-dlp, ffmpeg and deno are downloaded on first use into the user data folder (app bundle may not be writable)
 const binName = (name) => platform === "win32" ? name + ".exe" : name;
@@ -522,24 +546,24 @@ function getSpotifyToken()
     return token.promise;
 }
 
-// For the credentials dialog. The secret itself stays in the main process
 // For playing songs in the page (it builds file:// urls from this)
 ipc.handle("getSongsFolder", function()
 {
     return defaultFolderPath;
 });
 
+// For the credentials dialog, which shows the saved ones (the secret masked until its eye is clicked)
 ipc.handle("getSpotifyCredentials", function()
 {
     const credentials = loadSpotifyCredentials();
-    return { clientId: credentials ? credentials.clientId : "", hasSecret: !!credentials };
+    return { clientId: credentials ? credentials.clientId : "", clientSecret: credentials ? credentials.clientSecret : "" };
 });
 
-// Check new credentials with spotify, and only save them if they work. An empty secret keeps the saved one
+// Check new credentials with spotify, and only save them if they work
 ipc.handle("saveSpotifyCredentials", async function(event, clientId, clientSecret)
 {
     clientId = (clientId || "").trim();
-    clientSecret = (clientSecret || "").trim() || (loadSpotifyCredentials() || {}).clientSecret;
+    clientSecret = (clientSecret || "").trim();
     if (!clientId || !clientSecret)
     {
         return { ok: false, message: "Enter both the Client ID and the Client Secret." };
@@ -682,98 +706,176 @@ function watchSongsFolder(sender)
     }
 }
 
-ipc.on("openSongsFolder", function(event, data)
+// Save one song's tags (title, artist, album, cover). Resolves "saved", "skipped" (not an mp3, or nothing to save) or "failed"
+async function saveSongTags(songData)
 {
-    // Open folder in system file explorer
-    let command;
-
-    if (platform === "win32")
+    // ID3 tags are only for mp3s (they'd corrupt mp4s etc.)
+    if (!songData.songFileName.endsWith(".mp3"))
     {
-        command = `start "" "${defaultFolderPath}"`;
-    }
-    else if (platform === "darwin")
-    {
-        command = `open "${defaultFolderPath}"`;
-    }
-    else if (platform === "linux")
-    {
-        command = `xdg-open "${defaultFolderPath}"`;
+        return "skipped";
     }
 
-    exec(command, (error) =>
+    // Only set fields that have a value, update keeps the file's other tags
+    var tags = {};
+    if (songData.songName) tags.title = songData.songName;
+    if (songData.artistName) tags.artist = songData.artistName;
+    if (songData.albumName) tags.album = songData.albumName;
+
+    try
     {
-        if (error)
+        // Spotify covers are http(s), anything else (e.g. an empty img src) means no cover
+        if (/^https?:\/\//.test(songData.albumImage))
         {
-            console.error(`Error opening folder: ${error}`);
+            const res = await fetch(songData.albumImage);
+            if (!res.ok)
+            {
+                throw new Error(`Cover download failed: ${res.status} ${res.statusText}`);
+            }
+            tags.APIC =
+            {
+                mime: res.headers.get("content-type") || "image/jpeg",
+                type: { id: 3 },          // 3 = front cover
+                description: "Cover",
+                imageBuffer: Buffer.from(await res.arrayBuffer())
+            };
         }
-    });
-});
+
+        // Nothing to save if the song was never scanned or edited
+        if (Object.keys(tags).length == 0)
+        {
+            return "skipped";
+        }
+
+        await nodeid3.Promise.update(tags, path.join(defaultFolderPath, songData.songFileName));
+        return "saved";
+    }
+    catch (error)
+    {
+        console.error(`Couldn't save ${songData.songFileName}: ${error.message}`);
+        return "failed";
+    }
+}
 
 ipc.on("saveSongs", async function(event, songFileList)
 {
-    // Each file's result is sent as it finishes (for its icon), counts are sent at the end (for one message)
-    var saved = 0;
-    var skipped = 0;
-    var failed = 0;
-
-    // Go through song file list
+    // Each file's result is sent as it finishes (for its icon), counts are sent at the end (for one message).
+    // One bad song doesn't stop the rest from saving
+    var counts = { saved: 0, skipped: 0, failed: 0 };
     for (const songData of songFileList)
     {
-        // ID3 tags are only for mp3s (they'd corrupt mp4s etc.)
-        if (!songData.songFileName.endsWith(".mp3"))
+        const status = await saveSongTags(songData);
+        counts[status]++;
+        event.sender.send("songSaved", songData.songFileName, status);
+    }
+
+    event.sender.send("songsSaved", counts);
+});
+
+// Where Export goes by default: a folder the music app imports from by itself (Apple Music on macOS, iTunes),
+// otherwise the plain Music folder. Only the default locations are checked
+function getMusicLibrary()
+{
+    const music = app.getPath("music");
+    const autoImportFolders =
+    [
+        { folder: path.join(music, "Music", "Media.localized", "Automatically Add to Music.localized"), name: "Music" },
+        { folder: path.join(music, "Music", "Media", "Automatically Add to Music.localized"), name: "Music" },
+        { folder: path.join(music, "iTunes", "iTunes Media", "Automatically Add to iTunes.localized"), name: "iTunes" },
+        { folder: path.join(music, "iTunes", "iTunes Media", "Automatically Add to iTunes"), name: "iTunes" },
+    ];
+    return autoImportFolders.find(library => fs.existsSync(library.folder)) || { folder: music, name: "your Music folder" };
+}
+
+// A path in folder for fileName that isn't taken yet: "Song.mp3", then "Song (1).mp3", ...
+function freePath(folder, fileName)
+{
+    const extension = path.extname(fileName);
+    const base = path.basename(fileName, extension);
+    var candidate = path.join(folder, fileName);
+    for (let i = 1; fs.existsSync(candidate); i++)
+    {
+        candidate = path.join(folder, `${base} (${i})${extension}`);
+    }
+    return candidate;
+}
+
+// Move a file, copying instead when it's going to another drive (rename can't do that)
+function moveFile(source, destination)
+{
+    try
+    {
+        fs.renameSync(source, destination);
+    }
+    catch (error)
+    {
+        if (error.code != "EXDEV")
         {
-            skipped++;
-            event.sender.send("songSaved", songData.songFileName, "skipped");
-            continue;
+            throw error;
         }
+        fs.copyFileSync(source, destination);
+        fs.unlinkSync(source);
+    }
+}
 
-        // Only set fields that have a value, update keeps the file's other tags
-        var tags = {};
-        if (songData.songName) tags.title = songData.songName;
-        if (songData.artistName) tags.artist = songData.artistName;
-        if (songData.albumName) tags.album = songData.albumName;
+// The export modal's starting folder (Apple Music's import folder on macOS), until the user picks another
+ipc.handle("getDefaultExportFolder", function()
+{
+    return getMusicLibrary().folder;
+});
 
-        // One bad song shouldn't stop the rest from saving
+// Clicking the export modal's folder: pick a different one, starting from the current. Resolves the new path, or null if cancelled
+ipc.handle("chooseExportFolder", async function(event, currentFolder)
+{
+    const choice = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender),
+    {
+        title: "Export folder",
+        buttonLabel: "Choose",
+        defaultPath: currentFolder,
+        properties: ["openDirectory", "createDirectory"]
+    });
+    return choice.canceled || !choice.filePaths.length ? null : choice.filePaths[0];
+});
+
+// Move songs into folder (they leave KDL), as they are, saved or not
+ipc.handle("exportSongs", async function(event, fileNames, folder)
+{
+    if (!fs.existsSync(folder))
+    {
+        return { error: "The export folder doesn't exist anymore, choose another." };
+    }
+
+    var moved = [];
+    var failed = 0;
+    for (const fileName of fileNames)
+    {
         try
         {
-            // Spotify covers are http(s), anything else (e.g. an empty img src) means no cover
-            if (/^https?:\/\//.test(songData.albumImage))
-            {
-                const res = await fetch(songData.albumImage);
-                if (!res.ok)
-                {
-                    throw new Error(`Cover download failed: ${res.status} ${res.statusText}`);
-                }
-                tags.APIC =
-                {
-                    mime: res.headers.get("content-type") || "image/jpeg",
-                    type: { id: 3 },          // 3 = front cover
-                    description: "Cover",
-                    imageBuffer: Buffer.from(await res.arrayBuffer())
-                };
-            }
-
-            // Nothing to save if the song was never scanned or edited
-            if (Object.keys(tags).length == 0)
-            {
-                skipped++;
-                event.sender.send("songSaved", songData.songFileName, "skipped");
-                continue;
-            }
-
-            await nodeid3.Promise.update(tags, path.join(defaultFolderPath, songData.songFileName));
-            saved++;
-            event.sender.send("songSaved", songData.songFileName, "saved");
+            moveFile(path.join(defaultFolderPath, fileName), freePath(folder, fileName));
+            moved.push(fileName);
         }
         catch (error)
         {
-            console.error(`Couldn't save ${songData.songFileName}: ${error.message}`);
+            console.error(`Couldn't move ${fileName}: ${error.message}`);
             failed++;
-            event.sender.send("songSaved", songData.songFileName, "failed");
         }
     }
 
-    event.sender.send("songsSaved", { saved, skipped, failed });
+    // "Music" when it's the music app's import folder, otherwise the folder's name
+    const library = getMusicLibrary();
+    const folderName = path.resolve(folder) == path.resolve(library.folder) ? library.name : path.basename(folder);
+    return { moved, failed, folderName };
+});
+
+// Dragging a song out of the list drags the real file (into Finder, Music, the desktop...). The drag needs an icon
+ipc.on("startDrag", async function(event, fileName)
+{
+    const filePath = path.join(defaultFolderPath, fileName);
+    if (!fs.existsSync(filePath))
+    {
+        return;
+    }
+    const icon = await app.getFileIcon(filePath, { size: "normal" });
+    event.sender.startDrag({ file: filePath, icon });
 });
 
 ipc.on("searchSong", function(event, songName)

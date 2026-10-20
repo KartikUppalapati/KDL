@@ -28,20 +28,20 @@
                         
                         <!-- Profile Area -->
                         <div class="navbar-right">
-                            <button class="nav nav-link button-hover" onclick="openCredentialsDialog()" data-toggle="tooltip" data-placement="right" title="Spotify credentials">
-                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-key-variant"></i></h5>
-                            </button>
                             <button class="nav nav-link button-hover" onclick="deleteSongs()" data-toggle="tooltip" data-placement="right" title="Delete all songs">
                                 <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-delete"></i></h5>
+                            </button>
+                            <button class="nav nav-link button-hover" onclick="openCredentialsDialog()" data-toggle="tooltip" data-placement="right" title="Spotify credentials">
+                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-key-variant"></i></h5>
                             </button>
                             <button class="nav nav-link button-hover" onclick="scanSongs()" data-toggle="tooltip" data-placement="right" title="Scan all songs">
                                 <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-file-find"></i></h5>
                             </button>
-                            <button class="nav nav-link button-hover" onclick="openSongsFolder()" data-toggle="tooltip" data-placement="right" title="Open song folder">
-                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-folder-open"></i></h5>
-                            </button>
                             <button class="nav nav-link button-hover" onclick="saveSongs()" data-toggle="tooltip" data-placement="right" title="Save songs">
                                 <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-content-save"></i></h5>
+                            </button>
+                            <button class="nav nav-link button-hover" onclick="exportSongs()" data-toggle="tooltip" data-placement="right" title="Export all songs to a folder (Apple Music by default)">
+                                <h5 style="font-weight: bold;"><i class="mdi mdi-24px mdi-folder-move"></i></h5>
                             </button>
                         </div>
                     </nav>
@@ -129,17 +129,6 @@
                                     <!-- Folder Area -->
                                     <div class="card card-default">
                                         <div class="card-body">
-                                            <!-- Folder Path -->
-                                            <!-- <div class="input-group mt-3 mb-0">
-                                                <div class="input-group-prepend">
-                                                    <span class="input-group-text">
-                                                        <i class="mdi mdi-folder-open" style="cursor: pointer;" onclick="openSongsFolder()"></i>
-                                                    </span>
-                                                </div>
-                                                <input id="folderPath" class="form-control"
-                                                style="pointer-events: none;" type="text">
-                                            </div> -->
-
                                             <!-- File List -->
                                             <div class="row mt-3">
                                                 <div class="col-12">
@@ -236,6 +225,33 @@
                     <div style="display: flex; justify-content: flex-end; gap: 8px;">
                         <button id="confirmDialogCancel" class="btn btn-light">Cancel</button>
                         <button id="confirmDialogConfirm" class="btn btn-danger"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export modal (export button). Clicking the folder picks a different one, and it's remembered -->
+        <div id="exportDialog" class="dialog-backdrop" style="display: none;" onclick="if (event.target == this) closeExportDialog()">
+            <div class="card card-default dialog-card">
+                <div class="card-body">
+                    <h5 class="mb-2">Export songs</h5>
+                    <p id="exportDialogText" class="mb-3" style="font-size: 13px;"></p>
+
+                    <div class="input-group mb-1 export-folder" onclick="chooseExportFolder()">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                <i class="mdi mdi-folder"></i>
+                            </span>
+                        </div>
+                        <!-- Cut off at the start, so the end of the path (where it goes) stays visible -->
+                        <div class="form-control export-folder-path"><bdi id="exportFolderPath"></bdi></div>
+                    </div>
+
+                    <p id="exportDialogStatus" class="mt-2 mb-2" style="font-size: 13px; min-height: 20px;"></p>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        <button class="btn btn-light" onclick="closeExportDialog()">Cancel</button>
+                        <button id="exportDialogExport" class="btn btn-primary" onclick="confirmExport()">Export</button>
                     </div>
                 </div>
             </div>
@@ -525,9 +541,10 @@
                 return false;
             }
 
-            // Clicking anywhere on a song searches spotify for it, the copy button stops its click from also doing that
+            // Clicking anywhere on a song searches spotify for it (the copy button stops its click from also doing that).
+            // Dragging it drags the real file out of the app
             folderFiles.insertAdjacentHTML("beforeend",
-            `<div class="mb-3 button-hover" onclick="searchSong(this.children[1])" style="cursor: pointer; position: relative; padding-right: 40px;">
+            `<div class="mb-3 button-hover" onclick="searchSong(this.children[1])" draggable="true" ondragstart="dragSongOut(event, this)" style="cursor: pointer; position: relative; padding-right: 40px;">
                 <div style="white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">
                     <i class="save-status mdi" style="display: none;"></i>
                     <i class="match-unsure mdi mdi-help-circle" style="display: none; color: var(--warning);"
@@ -1001,19 +1018,7 @@
                 return;
             }
 
-            var fileList = [];
-            for (let i = 0; i < folderFiles.children.length; i++)
-            {
-                fileList.push(
-                {
-                    "songFileName": folderFiles.children[i].children[1].getAttribute("data-file-name"),
-                    "albumImage": folderFiles.children[i].children[1].getAttribute("data-song-image"),
-                    "songName": folderFiles.children[i].children[1].getAttribute("data-song-title"),
-                    "artistName": folderFiles.children[i].children[1].getAttribute("data-song-artist"),
-                    "albumName": folderFiles.children[i].children[1].getAttribute("data-song-album"),
-                });
-            }
-
+            var fileList = getSongDataList();
             if (fileList.length == 0)
             {
                 errorMessage("No files to save!");
@@ -1022,6 +1027,137 @@
             
             stopPlayback();
             ipc.send("saveSongs", fileList);
+        }
+
+        // Every song in the list with its metadata, for main to save
+        function getSongDataList()
+        {
+            return [...folderFiles.children].map(entry =>
+            {
+                var songDiv = entry.children[1];
+                return {
+                    "songFileName": songDiv.getAttribute("data-file-name"),
+                    "albumImage": songDiv.getAttribute("data-song-image"),
+                    "songName": songDiv.getAttribute("data-song-title"),
+                    "artistName": songDiv.getAttribute("data-song-artist"),
+                    "albumName": songDiv.getAttribute("data-song-album"),
+                };
+            });
+        }
+
+        // Export modal: moves every song in the list (saved or not) to a folder, Apple Music's import folder by default.
+        // The folder is remembered between launches
+        var exportDialog = document.getElementById("exportDialog");
+        var exportFolder = null;
+
+        function setExportStatus(text, color = "")
+        {
+            var status = document.getElementById("exportDialogStatus");
+            status.textContent = text;
+            status.style.color = color;
+        }
+
+        // Show the folder like Finder does: home folder as ~, without macOS' hidden ".localized" endings. Full path on hover
+        function showExportFolder()
+        {
+            var home = require("os").homedir();
+            var shown = exportFolder.startsWith(home) ? "~" + exportFolder.slice(home.length) : exportFolder;
+            document.getElementById("exportFolderPath").textContent = shown.replace(/\.localized(?=[\/\\]|$)/g, "");
+            document.querySelector(".export-folder").title = exportFolder + "\nClick to choose a different folder";
+        }
+
+        async function exportSongs()
+        {
+            if (document.getElementById("downloadLogo").classList.contains("mdi-spin"))
+            {
+                errorMessage("Download in progress!");
+                return;
+            }
+
+            var count = folderFiles.children.length;
+            if (count == 0)
+            {
+                errorMessage("No songs to export!");
+                return;
+            }
+
+            try
+            {
+                exportFolder = localStorage.getItem("exportFolder");
+            }
+            catch (error) {}
+            exportFolder = exportFolder || await ipc.invoke("getDefaultExportFolder");
+            showExportFolder();
+
+            document.getElementById("exportDialogText").textContent =
+                `${count == 1 ? "Moves the 1 song" : `Moves all ${count} songs`} out of KDL into this folder. Click it to choose a different one.`;
+            setExportStatus("");
+            exportDialog.style.display = "";
+            document.getElementById("exportDialogExport").focus();
+        }
+
+        function closeExportDialog()
+        {
+            exportDialog.style.display = "none";
+        }
+
+        // Clicking the folder: pick another (main opens a folder picker), and remember it
+        async function chooseExportFolder()
+        {
+            var folder = await ipc.invoke("chooseExportFolder", exportFolder);
+            if (folder)
+            {
+                exportFolder = folder;
+                try
+                {
+                    localStorage.setItem("exportFolder", folder);
+                }
+                catch (error) {}
+                showExportFolder();
+                setExportStatus("");
+            }
+        }
+
+        async function confirmExport()
+        {
+            var exportButton = document.getElementById("exportDialogExport");
+            var fileNames = [...folderFiles.children].map(entry => entry.children[1].getAttribute("data-file-name"));
+            stopPlayback();
+            exportButton.disabled = true;
+            var result = await ipc.invoke("exportSongs", fileNames, exportFolder);
+            exportButton.disabled = false;
+
+            if (result.error)
+            {
+                setExportStatus(result.error, "var(--danger)");
+                return;
+            }
+            closeExportDialog();
+
+            // The folder watcher would remove them too, this is just quicker
+            result.moved.forEach(fileName => findFileRow(fileName)?.parentElement.remove());
+
+            var songs = (count) => count + (count == 1 ? " song" : " songs");
+            if (result.failed > 0)
+            {
+                errorMessage(`${songs(result.failed)} couldn't be moved, ${result.moved.length} exported to ${result.folderName}.`);
+            }
+            else
+            {
+                successMessage(`Exported ${songs(result.moved.length)} to ${result.folderName}!`);
+            }
+        }
+
+        document.addEventListener("keydown", function(event)
+        {
+            if (event.key == "Escape" && exportDialog.style.display != "none") closeExportDialog();
+        });
+
+        // Dragging a song row drags its real file out of the app (main starts the drag)
+        function dragSongOut(event, entry)
+        {
+            event.preventDefault();
+            ipc.send("startDrag", entry.children[1].getAttribute("data-file-name"));
         }
 
         // Scan all
@@ -1098,19 +1234,13 @@
             }
 
             var confirmed = await confirmDialog("Delete all songs?",
-                `This deletes all ${count} ${count == 1 ? "song" : "songs"} in the TempKdlFiles folder from your computer. It can't be undone.`,
+                `This deletes all ${count} ${count == 1 ? "song" : "songs"} in KDL's songs folder from your computer. It can't be undone.`,
                 "Delete");
             if (confirmed)
             {
                 stopPlayback();
                 ipc.send("deleteSongs", {});
             }
-        }
-
-        // Open folder
-        function openSongsFolder()
-        {
-            ipc.send("openSongsFolder", {});
         }
 
         // Download settings, sent with each download and saved between launches.
@@ -1287,14 +1417,13 @@
             credentialsStatus.style.color = color;
         }
 
-        // Open with the saved Client ID filled in. The saved secret is never sent to the page, so its field starts empty.
+        // Open with the saved credentials filled in, the secret masked until its eye is clicked.
         // message explains why it opened by itself (e.g. a search needed credentials)
         async function openCredentialsDialog(message = "")
         {
             var saved = await ipc.invoke("getSpotifyCredentials");
             credentialsClientId.value = saved.clientId;
-            credentialsClientSecret.value = "";
-            credentialsClientSecret.placeholder = saved.hasSecret ? "Saved (leave empty to keep it)" : "Client Secret";
+            credentialsClientSecret.value = saved.clientSecret;
             credentialsClientSecret.type = "password";
             document.getElementById("credentialsSecretEye").className = "mdi mdi-eye";
             setCredentialsStatus(message, message ? "var(--danger)" : "");
