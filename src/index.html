@@ -326,6 +326,12 @@
         var dropdownToggle = document.querySelector('.dropdown-toggle');
         var dropdownMenu = document.querySelector('.dropdown-menu');
 
+        // "1 song" / "2 songs"
+        function songCount(count)
+        {
+            return count + (count == 1 ? " song" : " songs");
+        }
+
         // Escape text before putting it in html
         function escapeHtml(text)
         {
@@ -963,12 +969,11 @@
 
         ipc.on("songsSaved", function(event, result)
         {
-            var files = (count) => count + (count == 1 ? " file" : " files");
             var skippedText = result.skipped > 0 ? ` (${result.skipped} skipped)` : "";
 
             if (result.failed > 0)
             {
-                errorMessage(`${files(result.failed)} not saved, ${result.saved} saved.${skippedText}`);
+                errorMessage(`${songCount(result.failed)} not saved, ${result.saved} saved.${skippedText}`);
             }
             else if (result.saved == 0)
             {
@@ -976,7 +981,7 @@
             }
             else
             {
-                successMessage(`${files(result.saved)} saved!${skippedText}`);
+                successMessage(`${songCount(result.saved)} saved!${skippedText}`);
             }
         });
 
@@ -1004,11 +1009,11 @@
         {
             if (status != 0)
             {
-                errorMessage("Couldn't delete songs!");
+                errorMessage(deletingCount == 1 ? "Couldn't delete the song!" : "Couldn't delete the songs!");
                 return;   
             }
 
-            successMessage("All songs deleted.");
+            successMessage(deletingCount == 1 ? "Song deleted." : `All ${songCount(deletingCount)} deleted.`);
             stopPlayback();
             folderFiles.innerHTML = "";
         });
@@ -1094,7 +1099,7 @@
             showExportFolder();
 
             document.getElementById("exportDialogText").textContent =
-                `${count == 1 ? "Moves the 1 song" : `Moves all ${count} songs`} out of KDL into this folder. Click it to choose a different one.`;
+                `${count == 1 ? "Moves the 1 song" : `Moves all ${songCount(count)}`} out of KDL into this folder. Click it to choose a different one.`;
             setExportStatus("");
             exportDialog.style.display = "";
             document.getElementById("exportDialogExport").focus();
@@ -1141,14 +1146,13 @@
             // The folder watcher would remove them too, this is just quicker
             result.moved.forEach(fileName => findFileRow(fileName)?.parentElement.remove());
 
-            var songs = (count) => count + (count == 1 ? " song" : " songs");
             if (result.failed > 0)
             {
-                errorMessage(`${songs(result.failed)} couldn't be moved, ${result.moved.length} exported to ${result.folderName}.`);
+                errorMessage(`${songCount(result.failed)} couldn't be moved, ${result.moved.length} exported to ${result.folderName}.`);
             }
             else
             {
-                successMessage(`Exported ${songs(result.moved.length)} to ${result.folderName}!`);
+                successMessage(`Exported ${songCount(result.moved.length)} to ${result.folderName}!`);
             }
         }
 
@@ -1223,6 +1227,8 @@
             });
         }
 
+        // How many songs the delete was for, for its result message
+        var deletingCount = 0;
         async function deleteSongs()
         {
             if (document.getElementById("downloadLogo").classList.contains("mdi-spin"))
@@ -1238,11 +1244,12 @@
                 return;
             }
 
-            var confirmed = await confirmDialog("Delete all songs?",
-                `This deletes all ${count} ${count == 1 ? "song" : "songs"} in KDL's songs folder from your computer. It can't be undone.`,
+            var confirmed = await confirmDialog(count == 1 ? "Delete the song?" : `Delete all ${songCount(count)}?`,
+                (count == 1 ? "This deletes the 1 song" : `This deletes all ${songCount(count)}`) + " in KDL's songs folder from your computer. It can't be undone.",
                 "Delete");
             if (confirmed)
             {
+                deletingCount = count;
                 stopPlayback();
                 ipc.send("deleteSongs", {});
             }
