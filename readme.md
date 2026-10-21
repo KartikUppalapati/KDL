@@ -1,8 +1,7 @@
-# KDL
-
 ## Setup
 
-Searching Spotify needs a Client ID and Client Secret. Create an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard), then click the key button at the top of KDL and paste them in. KDL checks them with Spotify and saves them on that computer only (the secret is encrypted with the OS keychain), so they aren't in the code or the built app.
+Searching Spotify needs a Client ID and Client Secret. Create an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard), then click the key button at the top of the app and paste them in. The keys are checked with Spotify and saved locally only (the secret is encrypted with the OS keychain).
+
 
 ## Install app via terminal (apple silicon macs only)
 
@@ -10,7 +9,7 @@ Searching Spotify needs a Client ID and Client Secret. Create an app in the [Spo
 curl -sL https://api.github.com/repos/KartikUppalapati/KDL/releases/latest | grep -o 'https://[^"]*darwin-arm64[^"]*\.zip' | head -1 | xargs curl -L -o /tmp/KDL.zip && ditto -x -k /tmp/KDL.zip /Applications && rm /tmp/KDL.zip
 ```
 
-## Clone repo and Run via npm
+## Clone repo and run via npm
 
 Requires Node.js 22.13 or newer (for Electron Forge 8).
 
@@ -20,16 +19,3 @@ Run the following commands to install dependencies and start the application:
 npm install
 npm run start
 ```
-
-
-## Download
-
-Then run the following command to create an executable of the application:
-
-```bash
-npm run make
-```
-
-## Updates
-
-Installed copies check GitHub for a newer release once a day and update themselves. On macOS the new version is downloaded in the background and installed when KDL quits (or right away with the green update button). Windows uses the Squirrel installer's updater, and on Linux the button links to the release.
