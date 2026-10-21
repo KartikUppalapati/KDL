@@ -4,7 +4,13 @@
 
 Searching Spotify needs a Client ID and Client Secret. Create an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard), then click the key button at the top of KDL and paste them in. KDL checks them with Spotify and saves them on that computer only (the secret is encrypted with the OS keychain), so they aren't in the code or the built app.
 
-## Installation & Running
+## Install app via terminal (apple silicon macs only)
+
+```bash
+curl -sL https://api.github.com/repos/KartikUppalapati/KDL/releases/latest | grep -o 'https://[^"]*darwin-arm64[^"]*\.zip' | head -1 | xargs curl -L -o /tmp/KDL.zip && ditto -x -k /tmp/KDL.zip /Applications && rm /tmp/KDL.zip
+```
+
+## Clone repo and Run via npm
 
 Requires Node.js 22.13 or newer (for Electron Forge 8).
 
